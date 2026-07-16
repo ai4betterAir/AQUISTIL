@@ -1,0 +1,28 @@
+__pycache__/
+*.py[cod]
+*.log
+*.out
+
+# Runtime and generated data
+API_Input/
+Outputs/
+input/
+output/
+code/API_Input/
+code/Outputs/
+code/input/
+code/output/
+
+# Experiment and scheduler output
+code/X1_output_*.txt
+code/output_*.txt
+code/slurm-*.out
+code/FeatureStats/X1_*.txt
+
+# Local environments and editor state
+.env
+.venv/
+venv/
+.vscode/
+.idea/
+
