@@ -645,12 +645,11 @@ def prepare_spatial_temporal_data(data, target_column, input_columns, spatial_co
     # Filter to only available features (excluding target column)
     available_features = [col for col in all_features if col in df.columns and col != target_column]
     
-    logging.info(f"Total features prepared: {len(available_features)}")
-    logging.info(f"  - Original input features: {len([f for f in available_features if f in input_columns])}")
-    logging.info(f"  - Spatial features: {len([f for f in available_features if f.startswith('spatial_')])}")
-    logging.info(f"  - Temporal features:  {len([f for f in available_features if any(t in f for t in ['Hour', 'Day', 'Month', 'Week'])])}")
-    logging.info(f"  - Lagged features: {len([f for f in available_features if 'lag_' in f])}")
-    logging.info(f"  - Rolling features: {len([f for f in available_features if 'rolling_' in f])}")
+    logging.info(
+        "Shared preprocessing prepared %d features; model-specific features "
+        "may be added after this stage.",
+        len(available_features),
+    )
     
     return df, available_features
 

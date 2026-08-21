@@ -1,135 +1,99 @@
-"""
-MICE.py
-Safe wrapper for MICE imputation compatible with main.py
-
-This wrapper delegates to the unified impute_with_method where available,
-but also adds robust spatial-temporal preparation and defensive return behavior
-so outputs are produced for every regime and missingness level.
-"""
-import logging
-import os
-import importlib
 import numpy as np
 import pandas as pd
+import sklearn as SK
+import sklearn.impute as SKI
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+from ._shared import ImputationBase
 
 MODEL_NAME = "MICE"
 
-# Try to reuse the central impute_with_method if available
-def _load_impute_with_method():
-    try:
-        # prefer local impute module
-        from impute import impute_with_method
-        return impute_with_method
-    except Exception:
-        pass
-    try:
-        from Model.impute import impute_with_method
-        return impute_with_method
-    except Exception:
-        pass
-    # fallback: attempt to import by path relative to this file
-    try:
-        import importlib.util
-        impute_path = os.path.join(os.path.dirname(__file__), "impute.py")
-        spec = importlib.util.spec_from_file_location("impute_local", impute_path)
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        return getattr(mod, "impute_with_method")
-    except Exception:
-        return None
 
-_impute_with_method = _load_impute_with_method()
+class MICEImputation(ImputationBase):
+    def MICE_imputation(self, input_data_pd):
+        """
+        Configure and impute data using the sklearn MICE impute method.
 
-def _prepare_spatial_config_from_kwargs(kwargs):
-    try:
-        import config_spatial as cfg
-        # Determine canonical site token: prefer kwargs site_name, else derive from model_name
-        site_token = kwargs.get('site_name', '') or kwargs.get('model_name', '').rsplit('_', 1)[-1]
-        if site_token:
-            try:
-                site_token = str(site_token).split('_')[0]
-            except Exception:
-                site_token = str(site_token)
-        spatial_config = {
-            'input_directory': getattr(cfg, "INPUT_DIRECTORY", None),
-            'target_site': site_token,
-            'use_spatial': getattr(cfg, "USE_SPATIAL_FEATURES", False),
-            'use_temporal': getattr(cfg, "USE_TEMPORAL_FEATURES", True),
-            'use_lagged': getattr(cfg, "USE_LAGGED_FEATURES", False),
-            'use_rolling': getattr(cfg, "USE_ROLLING_FEATURES", False),
-        }
-        return spatial_config
-    except Exception:
-        return None
+        Mirrors the Core_iHPC nowcasting MICE design while keeping the AQUISTIL
+        model-runner wrapper below.
+        """
+        from sklearn.experimental import enable_iterative_imputer  # noqa: F401
 
-def impute_mice(data, target_column, input_columns, max_iter=10, random_state=42,
-                tol=0.01, custom_strategies=None, spatial_config=None, **kwargs):
-    """
-    Robust MICE wrapper.
+        empty_cols = [col for col in input_data_pd.columns if input_data_pd[col].isna().all()]
+        working_data_pd = input_data_pd.drop(columns=empty_cols) if empty_cols else input_data_pd
 
-    Returns a pd.DataFrame always (falls back to original input on error).
-    """
-    df_orig = data.copy() if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
-    try:
-        df = df_orig.copy()
-        # If caller didn't pass spatial_config, try to construct from kwargs
-        if spatial_config is None:
-            spatial_config = _prepare_spatial_config_from_kwargs(kwargs)
+        if working_data_pd.shape[1] == 0:
+            self.logger.warning(
+                "MICE received only all-missing columns; filling with zeros".ljust(self.justif - 2, '.') + 'FALLBACK'
+            )
+            return input_data_pd.fillna(0)
 
-        # Delegate to central imputer if available (this will itself handle spatial_config)
-        if _impute_with_method is not None:
-            try:
-                res = _impute_with_method(df, target_column, input_columns,
-                                          method='mice',
-                                          custom_strategies=custom_strategies,
-                                          spatial_config=spatial_config,
-                                          max_iter=max_iter,
-                                          random_state=random_state,
-                                          tol=tol,
-                                          **kwargs)
-                # Ensure a DataFrame is returned
-                if isinstance(res, pd.DataFrame):
-                    # align index/length with original
-                    if len(res) == len(df):
-                        res.index = df.index
-                    # ensure target column exists
-                    if target_column not in res.columns:
-                        res[target_column] = df[target_column]
-                    return res
-                else:
-                    logging.warning(f"{MODEL_NAME}: impute_with_method returned non-DataFrame ({type(res)}). Falling back to local IterativeImputer.")
-            except Exception as e:
-                logging.warning(f"{MODEL_NAME}: central imputer failed: {e}. Falling back to local MICE implementation.")
+        mice_imputer = SKI.IterativeImputer(
+            estimator=SK.linear_model.BayesianRidge(),
+            missing_values=np.nan,
+            sample_posterior=False,
+            max_iter=10,
+            tol=0.001,
+            n_nearest_features=None,
+            initial_strategy="mean",
+            imputation_order="ascending",
+        )
 
-        # Local fallback: use sklearn IterativeImputer defensively
-        from sklearn.experimental import enable_iterative_imputer  # noqa
-        from sklearn.impute import IterativeImputer
-        from sklearn.linear_model import BayesianRidge
+        imputed_values = mice_imputer.fit_transform(working_data_pd)
+        imputed_data_pd = pd.DataFrame(
+            imputed_values,
+            columns=working_data_pd.columns,
+            index=working_data_pd.index,
+        )
 
-        cols = [c for c in ([target_column] + input_columns) if c in df.columns]
-        if not cols:
-            logging.warning(f"{MODEL_NAME}: No columns available for imputation. Returning original DataFrame.")
-            return df_orig
+        if empty_cols:
+            self.logger.warning(
+                "MICE skipped all-missing columns {cols}; filling with zeros".format(cols=empty_cols).ljust(
+                    self.justif - 2, '.') + 'FALLBACK'
+            )
+            for col in empty_cols:
+                imputed_data_pd[col] = 0.0
+            imputed_data_pd = imputed_data_pd[input_data_pd.columns]
 
-        estimator = kwargs.get('estimator', BayesianRidge())
-        imputer = IterativeImputer(estimator=estimator, max_iter=max_iter, random_state=random_state, tol=tol)
+        return imputed_data_pd
 
-        # Coerce to numeric where possible (defensive)
-        for c in cols:
-            try:
-                df[c] = pd.to_numeric(df[c], errors='coerce')
-            except Exception:
-                pass
+    def impute_frame(self, input_data_pd):
+        return self.MICE_imputation(input_data_pd)
 
-        arr = imputer.fit_transform(df[cols])
-        imputed_df = pd.DataFrame(arr, columns=cols, index=df.index)
-        final = df.copy()
-        for c in cols:
-            final[c] = imputed_df[c]
-        return final
+    def impute(self, input_data_pd, save_data=False):
+        var_to_predict = getattr(self.Configuration, 'var_to_predict', None)
+        station_dict = self.extract_station_data(input_data_pd, var_to_predict=var_to_predict)
+        station_imputed_dict = {}
 
-    except Exception as exc:
-        logging.exception(f"{MODEL_NAME} failed: {exc}. Returning original data.")
-        return df_orig
+        for station, station_df in station_dict.items():
+            self.logger.info(''.ljust(self.justif, '-'))
+            self.logger.info("Imputing station: {s}".format(s=station).center(self.justif, '|'))
+            self.logger.info(''.ljust(self.justif, '-'))
+            imputed_station_df = self.MICE_imputation(station_df)
+            station_imputed_dict[station] = imputed_station_df
+            self.logger.info("MICE Imputation for {s}".format(s=station).ljust(self.justif - 2, '.') + 'OK')
+            if save_data:
+                self.save_imputed_data(imputed_station_df, station_name=station)
+
+        imputed_data_pd = self.combine_station_data(station_imputed_dict)
+        self.logger.info("Combined {n} stations".format(
+            n=len(station_imputed_dict)).ljust(self.justif - 2, '.') + 'OK')
+
+        if save_data:
+            self.save_imputed_data(imputed_data_pd, station_name=None)
+
+        return imputed_data_pd, station_imputed_dict
+
+
+def impute_mice(data, target_column, input_columns, custom_strategies=None, **kwargs):
+    df = data.copy()
+    cols = [c for c in ([target_column] + list(input_columns or [])) if c in df.columns]
+    if not cols:
+        return df
+
+    numeric = df.loc[:, cols].apply(pd.to_numeric, errors="coerce")
+    imputer = MICEImputation()
+    imputed = imputer.MICE_imputation(numeric).reindex(index=df.index, columns=cols)
+
+    for col in cols:
+        df[col] = imputed[col]
+    return df

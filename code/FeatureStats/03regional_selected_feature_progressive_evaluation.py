@@ -93,6 +93,15 @@ SELECTED_REGIONS = AVAILABLE_REGIONS[:]
 SELECTED_TARGET = "PM2.5"
 
 
+def display_target_name(target):
+    """Return the pollutant label used in CSV outputs, not a filesystem token."""
+    text = str(target).strip()
+    token = re.sub(r"[^A-Za-z0-9]+", "", text).upper()
+    if token == "PM25":
+        return "PM2.5"
+    return text
+
+
 def _apply_cli_env_overrides():
     """Allow standalone runs with explicit CLI flags instead of only env vars."""
     parser = argparse.ArgumentParser(add_help=False)
@@ -177,6 +186,7 @@ SELECTED_FEATURES_CSV = Path(
 )
 SITE_REGION_CSV = os.getenv("SITE_REGION_CSV", "").strip()
 TARGET_COLUMN = os.getenv("TARGET_COLUMN", SELECTED_TARGET)
+TARGET_OUTPUT_LABEL = display_target_name(TARGET_COLUMN)
 INPUT_FEATURES = env_list(
     "INPUT_FEATURES",
     ",".join(getattr(config, "LOCAL_ANALYSIS_INPUTS", [
@@ -891,8 +901,11 @@ def plot_region_r(summary_df, region):
 
 
 def aggregate_results(results_df):
+    group_cols = ["Region", "Configuration", "Blocks", "Selected_Local_Features", "Feature_List"]
+    if "Target" in results_df.columns:
+        group_cols.insert(1, "Target")
     grouped = (
-        results_df.groupby(["Region", "Configuration", "Blocks", "Selected_Local_Features", "Feature_List"], dropna=False)
+        results_df.groupby(group_cols, dropna=False)
         .agg(
             RMSE_mean=("RMSE", "mean"),
             RMSE_sd=("RMSE", "std"),
@@ -967,6 +980,7 @@ def main():
             feature_rows.append(
                 {
                     "Region": region,
+                    "Target": TARGET_OUTPUT_LABEL,
                     "Configuration": config_name,
                     "Blocks": blocks,
                     "Selected_Local_Features": ",".join(selected_local_features),
@@ -988,6 +1002,7 @@ def main():
                             miss_level,
                             seed,
                         )
+                        row["Target"] = TARGET_OUTPUT_LABEL
                         row["Blocks"] = blocks
                         row["Selected_Local_Features"] = ",".join(selected_local_features)
                         row["Feature_List"] = ",".join(feature_list)
@@ -1009,7 +1024,10 @@ def main():
     summary_path = SUMMARY_DIR / "regional_progressive_feature_block_summary.csv"
     best_path = SUMMARY_DIR / "regional_progressive_best_configuration_by_region.csv"
     summary_df.to_csv(summary_path, index=False)
-    summary_df.groupby("Region", as_index=False).first().to_csv(best_path, index=False)
+    best_group_cols = ["Region"]
+    if "Target" in summary_df.columns:
+        best_group_cols.append("Target")
+    summary_df.groupby(best_group_cols, as_index=False).first().to_csv(best_path, index=False)
 
     for region in summary_df["Region"].dropna().unique():
         plot_region_rmse(summary_df, region)

@@ -24,10 +24,49 @@ COMPARISON_INDEX_COLUMNS = [
     "Seed",
     "Scope",
 ]
-COMPARISON_METRIC_COLUMNS = ["RMSE", "MAE", "R", "NSE", "N_Valid"]
+COMPARISON_METRIC_COLUMNS = [
+    "RMSE", "RMAE", "R", "R2",
+]
 
 
-def write_models_comparison(metrics, output_path, models):
+def upsert_regional_metrics(existing, current):
+    """Merge current-run metrics into persisted metrics by evaluation/model key.
+
+    Current rows replace older rows with the same evaluation identity and
+    model. Unrelated historical models and evaluations are retained. The
+    function is intentionally side-effect free; callers decide where to save.
+    """
+    current_data = current.copy()
+    if isinstance(existing, (str, os.PathLike)):
+        existing_data = pd.read_csv(existing) if os.path.exists(existing) else pd.DataFrame()
+    else:
+        existing_data = existing.copy() if existing is not None else pd.DataFrame()
+
+    key = COMPARISON_INDEX_COLUMNS + ["Model"]
+    missing = [column for column in key if column not in current_data.columns]
+    if missing:
+        raise ValueError(
+            "Cannot upsert regional metrics; current rows are missing key columns: "
+            + ", ".join(missing)
+        )
+    if existing_data.empty:
+        merged = current_data
+    else:
+        existing_missing = [column for column in key if column not in existing_data.columns]
+        if existing_missing:
+            raise ValueError(
+                "Cannot upsert regional metrics; existing file is missing key columns: "
+                + ", ".join(existing_missing)
+            )
+        # Concat existing first and current last so the new run wins conflicts.
+        merged = pd.concat([existing_data, current_data], ignore_index=True, sort=False)
+
+    merged = merged.drop_duplicates(key, keep="last")
+    sort_columns = [column for column in COMPARISON_INDEX_COLUMNS + ["Model"] if column in merged]
+    return merged.sort_values(sort_columns, kind="stable").reset_index(drop=True)
+
+
+def write_models_comparison(metrics, output_path, models, preserve_existing=True):
     """Write one wide row per matched evaluation for the requested models.
 
     The source may be either a DataFrame or the path to the central regional
@@ -44,7 +83,13 @@ def write_models_comparison(metrics, output_path, models):
             + ", ".join(missing_columns)
         )
 
-    selected = data.loc[data["Model"].isin(models), required].copy()
+    configured_by_key = {str(model).casefold(): model for model in models}
+    model_keys = data["Model"].astype(str).str.casefold()
+    selected = data.loc[model_keys.isin(configured_by_key), required].copy()
+    # Module MODEL_NAME values may differ in capitalization from configuration
+    # (for example Interpolation vs interpolation). Match robustly while keeping
+    # configured spelling in comparison column names.
+    selected["Model"] = selected["Model"].astype(str).str.casefold().map(configured_by_key)
     present_models = set(selected["Model"].dropna().unique())
     missing_models = [model for model in models if model not in present_models]
     if missing_models:
@@ -59,6 +104,17 @@ def write_models_comparison(metrics, output_path, models):
         raise ValueError(
             "Cannot create an exact model comparison because duplicate "
             f"evaluations were found ({int(duplicates.sum())} rows)"
+        )
+
+    # Check row/model coverage independently of metric values. Some statistics
+    # are mathematically undefined for constant or very small samples and may
+    # correctly be NaN; that must not suppress the complete comparison CSV.
+    model_counts = selected.groupby(COMPARISON_INDEX_COLUMNS, dropna=False)["Model"].nunique()
+    incomplete_keys = model_counts[model_counts != len(models)]
+    if not incomplete_keys.empty:
+        raise ValueError(
+            "Cannot create a complete model comparison; "
+            f"{len(incomplete_keys)} evaluation keys do not contain every model"
         )
 
     wide = selected.pivot(
@@ -78,17 +134,46 @@ def write_models_comparison(metrics, output_path, models):
         for metric in COMPARISON_METRIC_COLUMNS
         for model in models
     ]
-    incomplete = wide[comparison_columns].isna().any(axis=1)
-    if incomplete.any():
-        raise ValueError(
-            "Cannot create a complete model comparison; "
-            f"{int(incomplete.sum())} evaluation keys do not contain every model"
-        )
-
     wide = wide.sort_values(
         ["Region", "Target", "Regime", "Missingness_Percent", "Scope", "Site", "Seed"],
         kind="stable",
     ).reset_index(drop=True)
+
+    if preserve_existing and os.path.exists(output_path):
+        existing = pd.read_csv(output_path)
+        existing_missing = [
+            column for column in COMPARISON_INDEX_COLUMNS
+            if column not in existing.columns
+        ]
+        if existing_missing:
+            raise ValueError(
+                "Cannot preserve existing model comparison; existing file is "
+                "missing key columns: " + ", ".join(existing_missing)
+            )
+
+        update_columns = [column for column in wide.columns if column not in COMPARISON_INDEX_COLUMNS]
+        old_metric_columns = [
+            column for column in existing.columns
+            if column not in COMPARISON_INDEX_COLUMNS and column not in update_columns
+        ]
+        merged = existing.merge(
+            wide,
+            on=COMPARISON_INDEX_COLUMNS,
+            how="outer",
+            suffixes=("", "__new"),
+        )
+        for column in update_columns:
+            new_column = "%s__new" % column
+            if new_column in merged.columns:
+                merged[column] = merged[new_column].combine_first(merged[column])
+                merged = merged.drop(columns=[new_column])
+        ordered_columns = COMPARISON_INDEX_COLUMNS + old_metric_columns + update_columns
+        ordered_columns = list(dict.fromkeys([c for c in ordered_columns if c in merged.columns]))
+        wide = merged[ordered_columns].sort_values(
+            ["Region", "Target", "Regime", "Missingness_Percent", "Scope", "Site", "Seed"],
+            kind="stable",
+        ).reset_index(drop=True)
+
     wide.to_csv(output_path, index=False)
     return wide
 

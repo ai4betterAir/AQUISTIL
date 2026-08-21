@@ -11,7 +11,7 @@ def impute_mice(data, target_column, input_columns, custom_strategies=None, **kw
     if not cols:
         return df
     # Use single-threaded operation to avoid excessive parallel memory usage
-    imputer = KNNImputer(n_neighbors=5, n_jobs=1)
+    imputer = KNNImputer(n_neighbors=5)
     try:
         arr = imputer.fit_transform(df[cols])
         df.loc[:, cols] = arr

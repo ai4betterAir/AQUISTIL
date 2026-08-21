@@ -52,7 +52,7 @@ MAX_SPATIAL_DISTANCE = 50  # km
 MODELS_TO_RUN = [
     "AQUISTIL",  # ✅ Iterative LightGBM with spatial features
     "LightGBM",                  # ✅ Standard LightGBM
-    # "TF_BRITS",
+    # "BRITS",
     # "TFAutoencoder",
     # "SPIN",
 ]

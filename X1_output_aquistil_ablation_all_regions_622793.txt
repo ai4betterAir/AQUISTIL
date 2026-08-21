@@ -1,0 +1,801 @@
+SLURM_JOB_ID: 622793
+Experiment mode: development_ablation
+Metrics directory: /mnt/scratch_lustre/ar_ai4ba_scratch/Ai4BetterAir/AQUISTIL/Outputs/Imputation_Results/Metrics_with_Ablation
+Regions: Sydney North-west Sydney South-west Upper Hunter Sydney East Northern Tablelands Southern Tablelands Lower Hunter Mid-North Coast Central Tablelands Illawarra Central Coast
+Python 3.11.10
+2026-08-20 22:09:17,676 - INFO - Saved region-site mapping JSON: /mnt/scratch_lustre/ar_ai4ba_scratch/Ai4BetterAir/AQUISTIL/Outputs/Imputation_Results/region_site_mapping.json
+2026-08-20 22:09:17,677 - INFO - Loaded 29 valid regions and 83 valid study sites from /mnt/scratch_lustre/ar_ai4ba_scratch/Ai4BetterAir/AQ_DATA/AquisNET_Data/Air Quality API Excel Power Query.xlsx [SiteDetails]
+2026-08-20 22:09:17,703 - INFO - Per-target model logs enabled: /mnt/scratch_lustre/ar_ai4ba_scratch/Ai4BetterAir/AQUISTIL/Outputs/Imputation_Results/Logs/By_Target
+2026-08-20 22:09:17,735 - INFO - ================================================================================
+2026-08-20 22:09:17,735 - INFO - SPATIAL–TEMPORAL IMPUTATION FRAMEWORK
+2026-08-20 22:09:17,735 - INFO - WITH MULTIPLE MISSINGNESS REGIMES
+2026-08-20 22:09:17,735 - INFO - ================================================================================
+2026-08-20 22:09:17,739 - INFO - AQUISTIL ablation run enabled; models: ['AQUISTIL', 'AQUISTIL_NoHistory', 'AQUISTIL_NoHistoryNoEvent', 'AQUISTIL_NoFFill', 'AQUISTIL_NoAdaptive', 'AQUISTIL_ExogenousOnly', 'AQUISTIL_NoAQUISTILFeatures', 'LightGBM']
+2026-08-20 22:09:17,740 - INFO - Overriding SELECT_TARGET_REGIONS from command line: ['Sydney North-west', 'Sydney South-west', 'Upper Hunter', 'Sydney East', 'Northern Tablelands', 'Southern Tablelands', 'Lower Hunter', 'Mid-North Coast', 'Central Tablelands', 'Illawarra', 'Central Coast']
+2026-08-20 22:09:17,740 - INFO - Overriding MISSINGNESS_LEVELS from command line: [0.05, 0.1, 0.2, 0.3]
+2026-08-20 22:09:17,740 - INFO - ================================================================================
+2026-08-20 22:09:17,740 - INFO - CHECKING DATA AVAILABILITY
+2026-08-20 22:09:17,740 - INFO - ================================================================================
+2026-08-20 22:09:17,775 - INFO - 
+Allobs_processed_DPE_station_api_Newcastle_Local_ALL.csv:
+2026-08-20 22:09:17,775 - INFO -   Rows: 100
+2026-08-20 22:09:17,776 - INFO -   Columns: ['datetime', 'HUMID_CARRINGTON', 'HUMID_MAYFIELD', 'HUMID_STOCKTON', 'NO2_CARRINGTON', 'NO2_MAYFIELD', 'NO2_STOCKTON', 'NOX_CARRINGTON', 'NOX_MAYFIELD', 'NOX_STOCKTON', 'NO_CARRINGTON', 'NO_MAYFIELD', 'NO_STOCKTON', 'OZONE_STOCKTON', 'PM10_CARRINGTON', 'PM10_MAYFIELD', 'PM10_STOCKTON', 'PM2.5_CARRINGTON', 'PM2.5_MAYFIELD', 'PM2.5_STOCKTON', 'RAIN_CARRINGTON', 'RAIN_MAYFIELD', 'RAIN_STOCKTON', 'SOLAR_MAYFIELD', 'TEMP_CARRINGTON', 'TEMP_MAYFIELD', 'TEMP_STOCKTON', 'WDR_CARRINGTON', 'WDR_MAYFIELD', 'WDR_STOCKTON', 'WSP_CARRINGTON', 'WSP_MAYFIELD', 'WSP_STOCKTON']
+2026-08-20 22:09:17,805 - INFO - 
+Allobs_processed_DPE_station_api_Sydney_East_ALL.csv:
+2026-08-20 22:09:17,805 - INFO -   Rows: 100
+2026-08-20 22:09:17,805 - INFO -   Columns: ['datetime', 'CO_ALEXANDRIA', 'CO_COOK AND PHILLIP', 'CO_LIDCOMBE', 'CO_MACQUARIE PARK', 'CO_ROZELLE', 'CO_ULTIMO-UTS', 'HUMID_ALEXANDRIA', 'HUMID_COOK AND PHILLIP', 'HUMID_EARLWOOD', 'HUMID_LIDCOMBE', 'HUMID_MACQUARIE PARK', 'HUMID_RANDWICK', 'HUMID_ROZELLE', 'HUMID_ULTIMO-UTS', 'NEPH_ALEXANDRIA', 'NEPH_COOK AND PHILLIP', 'NEPH_EARLWOOD', 'NEPH_LIDCOMBE', 'NEPH_MACQUARIE PARK', 'NEPH_RANDWICK', 'NEPH_ROZELLE', 'NEPH_ULTIMO-UTS', 'NO2_ALEXANDRIA', 'NO2_COOK AND PHILLIP', 'NO2_EARLWOOD', 'NO2_LIDCOMBE', 'NO2_MACQUARIE PARK', 'NO2_RANDWICK', 'NO2_ROZELLE', 'NO2_ULTIMO-UTS', 'NOX_ALEXANDRIA', 'NOX_COOK AND PHILLIP', 'NOX_EARLWOOD', 'NOX_LIDCOMBE', 'NOX_MACQUARIE PARK', 'NOX_RANDWICK', 'NOX_ROZELLE', 'NOX_ULTIMO-UTS', 'NO_ALEXANDRIA', 'NO_COOK AND PHILLIP', 'NO_EARLWOOD', 'NO_LIDCOMBE', 'NO_MACQUARIE PARK', 'NO_RANDWICK', 'NO_ROZELLE', 'NO_ULTIMO-UTS', 'OZONE_ALEXANDRIA', 'OZONE_COOK AND PHILLIP', 'OZONE_EARLWOOD', 'OZONE_LIDCOMBE', 'OZONE_MACQUARIE PARK', 'OZONE_RANDWICK', 'OZONE_ROZELLE', 'OZONE_ULTIMO-UTS', 'PM10_ALEXANDRIA', 'PM10_COOK AND PHILLIP', 'PM10_EARLWOOD', 'PM10_LIDCOMBE', 'PM10_MACQUARIE PARK', 'PM10_RANDWICK', 'PM10_ROZELLE', 'PM10_ULTIMO-UTS', 'PM2.5_ALEXANDRIA', 'PM2.5_COOK AND PHILLIP', 'PM2.5_EARLWOOD', 'PM2.5_LIDCOMBE', 'PM2.5_MACQUARIE PARK', 'PM2.5_RANDWICK', 'PM2.5_ROZELLE', 'PM2.5_ULTIMO-UTS', 'RAIN_LIDCOMBE', 'RAIN_MACQUARIE PARK', 'RAIN_RANDWICK', 'RAIN_ROZELLE', 'SOLAR_LIDCOMBE', 'SOLAR_MACQUARIE PARK', 'SOLAR_ROZELLE', 'TEMP_ALEXANDRIA', 'TEMP_COOK AND PHILLIP', 'TEMP_EARLWOOD', 'TEMP_LIDCOMBE', 'TEMP_MACQUARIE PARK', 'TEMP_RANDWICK', 'TEMP_ROZELLE', 'TEMP_ULTIMO-UTS', 'WDR_ALEXANDRIA', 'WDR_COOK AND PHILLIP', 'WDR_EARLWOOD', 'WDR_LIDCOMBE', 'WDR_MACQUARIE PARK', 'WDR_RANDWICK', 'WDR_ROZELLE', 'WDR_ULTIMO-UTS', 'WSP_ALEXANDRIA', 'WSP_COOK AND PHILLIP', 'WSP_EARLWOOD', 'WSP_LIDCOMBE', 'WSP_MACQUARIE PARK', 'WSP_RANDWICK', 'WSP_ROZELLE', 'WSP_ULTIMO-UTS']
+2026-08-20 22:09:17,825 - INFO - 
+Allobs_processed_DPE_station_api_Southern_Tablelands_ALL.csv:
+2026-08-20 22:09:17,826 - INFO -   Rows: 100
+2026-08-20 22:09:17,826 - INFO -   Columns: ['datetime', 'HUMID_GOULBURN', 'NEPH_GOULBURN', 'NO2_GOULBURN', 'NOX_GOULBURN', 'NO_GOULBURN', 'OZONE_GOULBURN', 'PM10_GOULBURN', 'PM2.5_GOULBURN', 'RAIN_GOULBURN', 'TEMP_GOULBURN', 'WDR_GOULBURN', 'WSP_GOULBURN']
+2026-08-20 22:09:17,855 - INFO - 
+Allobs_processed_DPE_station_api_Central_Coast_ALL.csv:
+2026-08-20 22:09:17,855 - INFO -   Rows: 100
+2026-08-20 22:09:17,855 - INFO -   Columns: ['datetime', 'CO_WYONG', 'HUMID_WYONG', 'NEPH_WYONG', 'NO2_WYONG', 'NOX_WYONG', 'NO_WYONG', 'OZONE_WYONG', 'PM10_WYONG', 'PM2.5_WYONG', 'RAIN_WYONG', 'TEMP_WYONG', 'WDR_WYONG', 'WSP_WYONG']
+2026-08-20 22:09:17,872 - INFO - 
+Allobs_processed_DPE_station_api_Northern_Tablelands_ALL.csv:
+2026-08-20 22:09:17,873 - INFO -   Rows: 100
+2026-08-20 22:09:17,873 - INFO -   Columns: ['datetime', 'HUMID_ARMIDALE', 'NEPH_ARMIDALE', 'PM10_ARMIDALE', 'PM2.5_ARMIDALE', 'RAIN_ARMIDALE', 'TEMP_ARMIDALE', 'WDR_ARMIDALE', 'WSP_ARMIDALE']
+2026-08-20 22:09:17,897 - INFO - 
+Allobs_processed_DPE_station_api_Central_Tablelands_ALL.csv:
+2026-08-20 22:09:17,897 - INFO -   Rows: 100
+2026-08-20 22:09:17,897 - INFO -   Columns: ['datetime', 'HUMID_BATHURST', 'HUMID_ORANGE', 'NEPH_ORANGE', 'NO2_ORANGE', 'NOX_ORANGE', 'NO_ORANGE', 'OZONE_BATHURST', 'OZONE_ORANGE', 'PM10_BATHURST', 'PM10_ORANGE', 'PM2.5_BATHURST', 'PM2.5_ORANGE', 'RAIN_ORANGE', 'TEMP_BATHURST', 'TEMP_ORANGE', 'WDR_BATHURST', 'WDR_ORANGE', 'WSP_BATHURST', 'WSP_ORANGE']
+2026-08-20 22:09:17,922 - INFO - 
+Allobs_processed_DPE_station_api_Sydney_ALL.csv:
+2026-08-20 22:09:17,922 - INFO -   Rows: 100
+2026-08-20 22:09:17,923 - INFO -   Columns: ['datetime', 'CO_CAMDEN', 'CO_CAMPBELLTOWN WEST', 'CO_COOK AND PHILLIP', 'CO_LIDCOMBE', 'CO_LIVERPOOL', 'CO_MACQUARIE PARK', 'CO_PARRAMATTA NORTH', 'CO_PENRITH', 'CO_PROSPECT', 'CO_ROUSE HILL', 'CO_ROZELLE', 'HUMID_BRINGELLY', 'HUMID_CAMDEN', 'HUMID_CAMPBELLTOWN WEST', 'HUMID_COOK AND PHILLIP', 'HUMID_EARLWOOD', 'HUMID_LIDCOMBE', 'HUMID_LIVERPOOL', 'HUMID_MACQUARIE PARK', 'HUMID_OAKDALE', 'HUMID_PARRAMATTA NORTH', 'HUMID_PENRITH', 'HUMID_PROSPECT', 'HUMID_RANDWICK', 'HUMID_RICHMOND', 'HUMID_ROUSE HILL', 'HUMID_ROZELLE', 'HUMID_ST MARYS', 'NEPH_BRINGELLY', 'NEPH_CAMDEN', 'NEPH_CAMPBELLTOWN WEST', 'NEPH_COOK AND PHILLIP', 'NEPH_EARLWOOD', 'NEPH_LIDCOMBE', 'NEPH_LIVERPOOL', 'NEPH_MACQUARIE PARK', 'NEPH_OAKDALE', 'NEPH_PARRAMATTA NORTH', 'NEPH_PENRITH', 'NEPH_PROSPECT', 'NEPH_RANDWICK', 'NEPH_RICHMOND', 'NEPH_ROUSE HILL', 'NEPH_ROZELLE', 'NEPH_ST MARYS', 'NO2_BRINGELLY', 'NO2_CAMDEN', 'NO2_CAMPBELLTOWN WEST', 'NO2_COOK AND PHILLIP', 'NO2_EARLWOOD', 'NO2_LIDCOMBE', 'NO2_LIVERPOOL', 'NO2_MACQUARIE PARK', 'NO2_OAKDALE', 'NO2_PARRAMATTA NORTH', 'NO2_PENRITH', 'NO2_PROSPECT', 'NO2_RANDWICK', 'NO2_RICHMOND', 'NO2_ROUSE HILL', 'NO2_ROZELLE', 'NO2_ST MARYS', 'NOX_BRINGELLY', 'NOX_CAMDEN', 'NOX_CAMPBELLTOWN WEST', 'NOX_COOK AND PHILLIP', 'NOX_EARLWOOD', 'NOX_LIDCOMBE', 'NOX_LIVERPOOL', 'NOX_MACQUARIE PARK', 'NOX_OAKDALE', 'NOX_PARRAMATTA NORTH', 'NOX_PENRITH', 'NOX_PROSPECT', 'NOX_RANDWICK', 'NOX_RICHMOND', 'NOX_ROUSE HILL', 'NOX_ROZELLE', 'NOX_ST MARYS', 'NO_BRINGELLY', 'NO_CAMDEN', 'NO_CAMPBELLTOWN WEST', 'NO_COOK AND PHILLIP', 'NO_EARLWOOD', 'NO_LIDCOMBE', 'NO_LIVERPOOL', 'NO_MACQUARIE PARK', 'NO_OAKDALE', 'NO_PARRAMATTA NORTH', 'NO_PENRITH', 'NO_PROSPECT', 'NO_RANDWICK', 'NO_RICHMOND', 'NO_ROUSE HILL', 'NO_ROZELLE', 'NO_ST MARYS', 'OZONE_BRINGELLY', 'OZONE_CAMDEN', 'OZONE_CAMPBELLTOWN WEST', 'OZONE_COOK AND PHILLIP', 'OZONE_EARLWOOD', 'OZONE_LIDCOMBE', 'OZONE_LIVERPOOL', 'OZONE_MACQUARIE PARK', 'OZONE_OAKDALE', 'OZONE_PARRAMATTA NORTH', 'OZONE_PENRITH', 'OZONE_PROSPECT', 'OZONE_RANDWICK', 'OZONE_RICHMOND', 'OZONE_ROUSE HILL', 'OZONE_ROZELLE', 'OZONE_ST MARYS', 'PM10_BRINGELLY', 'PM10_CAMDEN', 'PM10_CAMPBELLTOWN WEST', 'PM10_COOK AND PHILLIP', 'PM10_EARLWOOD', 'PM10_LIDCOMBE', 'PM10_LIVERPOOL', 'PM10_MACQUARIE PARK', 'PM10_OAKDALE', 'PM10_PARRAMATTA NORTH', 'PM10_PENRITH', 'PM10_PROSPECT', 'PM10_RANDWICK', 'PM10_RICHMOND', 'PM10_ROUSE HILL', 'PM10_ROZELLE', 'PM10_ST MARYS', 'PM2.5_BRINGELLY', 'PM2.5_CAMDEN', 'PM2.5_CAMPBELLTOWN WEST', 'PM2.5_COOK AND PHILLIP', 'PM2.5_EARLWOOD', 'PM2.5_LIDCOMBE', 'PM2.5_LIVERPOOL', 'PM2.5_MACQUARIE PARK', 'PM2.5_OAKDALE', 'PM2.5_PARRAMATTA NORTH', 'PM2.5_PENRITH', 'PM2.5_PROSPECT', 'PM2.5_RANDWICK', 'PM2.5_RICHMOND', 'PM2.5_ROUSE HILL', 'PM2.5_ROZELLE', 'PM2.5_ST MARYS', 'RAIN_CAMDEN', 'RAIN_CAMPBELLTOWN WEST', 'RAIN_LIDCOMBE', 'RAIN_LIVERPOOL', 'RAIN_MACQUARIE PARK', 'RAIN_OAKDALE', 'RAIN_PARRAMATTA NORTH', 'RAIN_PENRITH', 'RAIN_RANDWICK', 'RAIN_RICHMOND', 'RAIN_ROUSE HILL', 'RAIN_ROZELLE', 'SOLAR_BRINGELLY', 'SOLAR_LIDCOMBE', 'SOLAR_MACQUARIE PARK', 'SOLAR_OAKDALE', 'SOLAR_PROSPECT', 'SOLAR_ROZELLE', 'TEMP_BRINGELLY', 'TEMP_CAMDEN', 'TEMP_CAMPBELLTOWN WEST', 'TEMP_COOK AND PHILLIP', 'TEMP_EARLWOOD', 'TEMP_LIDCOMBE', 'TEMP_LIVERPOOL', 'TEMP_MACQUARIE PARK', 'TEMP_OAKDALE', 'TEMP_PARRAMATTA NORTH', 'TEMP_PENRITH', 'TEMP_PROSPECT', 'TEMP_RANDWICK', 'TEMP_RICHMOND', 'TEMP_ROUSE HILL', 'TEMP_ROZELLE', 'TEMP_ST MARYS', 'WDR_BRINGELLY', 'WDR_CAMDEN', 'WDR_CAMPBELLTOWN WEST', 'WDR_COOK AND PHILLIP', 'WDR_EARLWOOD', 'WDR_LIDCOMBE', 'WDR_LIVERPOOL', 'WDR_MACQUARIE PARK', 'WDR_OAKDALE', 'WDR_PARRAMATTA NORTH', 'WDR_PENRITH', 'WDR_PROSPECT', 'WDR_RANDWICK', 'WDR_RICHMOND', 'WDR_ROUSE HILL', 'WDR_ROZELLE', 'WDR_ST MARYS', 'WSP_BRINGELLY', 'WSP_CAMDEN', 'WSP_CAMPBELLTOWN WEST', 'WSP_COOK AND PHILLIP', 'WSP_EARLWOOD', 'WSP_LIDCOMBE', 'WSP_LIVERPOOL', 'WSP_MACQUARIE PARK', 'WSP_OAKDALE', 'WSP_PARRAMATTA NORTH', 'WSP_PENRITH', 'WSP_PROSPECT', 'WSP_RANDWICK', 'WSP_RICHMOND', 'WSP_ROUSE HILL', 'WSP_ROZELLE', 'WSP_ST MARYS']
+2026-08-20 22:09:17,945 - INFO - 
+Allobs_processed_DPE_station_api_Sydney_South_west_ALL.csv:
+2026-08-20 22:09:17,945 - INFO -   Rows: 100
+2026-08-20 22:09:17,945 - INFO -   Columns: ['datetime', 'CO_CAMDEN', 'CO_CAMPBELLTOWN WEST', 'CO_LIVERPOOL', 'HUMID_BARGO', 'HUMID_BRINGELLY', 'HUMID_CAMDEN', 'HUMID_CAMPBELLTOWN WEST', 'HUMID_LIVERPOOL', 'HUMID_OAKDALE', 'NEPH_BARGO', 'NEPH_BRINGELLY', 'NEPH_CAMDEN', 'NEPH_CAMPBELLTOWN WEST', 'NEPH_LIVERPOOL', 'NEPH_OAKDALE', 'NO2_BARGO', 'NO2_BRINGELLY', 'NO2_CAMDEN', 'NO2_CAMPBELLTOWN WEST', 'NO2_LIVERPOOL', 'NO2_OAKDALE', 'NOX_BARGO', 'NOX_BRINGELLY', 'NOX_CAMDEN', 'NOX_CAMPBELLTOWN WEST', 'NOX_LIVERPOOL', 'NOX_OAKDALE', 'NO_BARGO', 'NO_BRINGELLY', 'NO_CAMDEN', 'NO_CAMPBELLTOWN WEST', 'NO_LIVERPOOL', 'NO_OAKDALE', 'OZONE_BARGO', 'OZONE_BRINGELLY', 'OZONE_CAMDEN', 'OZONE_CAMPBELLTOWN WEST', 'OZONE_LIVERPOOL', 'OZONE_OAKDALE', 'PM10_BARGO', 'PM10_BRINGELLY', 'PM10_CAMDEN', 'PM10_CAMPBELLTOWN WEST', 'PM10_LIVERPOOL', 'PM10_OAKDALE', 'PM2.5_BARGO', 'PM2.5_BRINGELLY', 'PM2.5_CAMDEN', 'PM2.5_CAMPBELLTOWN WEST', 'PM2.5_LIVERPOOL', 'PM2.5_OAKDALE', 'RAIN_BARGO', 'RAIN_CAMDEN', 'RAIN_CAMPBELLTOWN WEST', 'RAIN_LIVERPOOL', 'RAIN_OAKDALE', 'SOLAR_BRINGELLY', 'SOLAR_OAKDALE', 'TEMP_BARGO', 'TEMP_BRINGELLY', 'TEMP_CAMDEN', 'TEMP_CAMPBELLTOWN WEST', 'TEMP_LIVERPOOL', 'TEMP_OAKDALE', 'WDR_BARGO', 'WDR_BRINGELLY', 'WDR_CAMDEN', 'WDR_CAMPBELLTOWN WEST', 'WDR_LIVERPOOL', 'WDR_OAKDALE', 'WSP_BARGO', 'WSP_BRINGELLY', 'WSP_CAMDEN', 'WSP_CAMPBELLTOWN WEST', 'WSP_LIVERPOOL', 'WSP_OAKDALE']
+2026-08-20 22:09:17,968 - INFO - 
+Allobs_processed_DPE_station_api_Sydney_North_west_ALL.csv:
+2026-08-20 22:09:17,969 - INFO -   Rows: 100
+2026-08-20 22:09:17,969 - INFO -   Columns: ['datetime', 'CO_PARRAMATTA NORTH', 'CO_PENRITH', 'CO_PROSPECT', 'CO_ROUSE HILL', 'HUMID_PARRAMATTA NORTH', 'HUMID_PENRITH', 'HUMID_PROSPECT', 'HUMID_RICHMOND', 'HUMID_ROUSE HILL', 'HUMID_ST MARYS', 'NEPH_PARRAMATTA NORTH', 'NEPH_PENRITH', 'NEPH_PROSPECT', 'NEPH_RICHMOND', 'NEPH_ROUSE HILL', 'NEPH_ST MARYS', 'NO2_PARRAMATTA NORTH', 'NO2_PENRITH', 'NO2_PROSPECT', 'NO2_RICHMOND', 'NO2_ROUSE HILL', 'NO2_ST MARYS', 'NOX_PARRAMATTA NORTH', 'NOX_PENRITH', 'NOX_PROSPECT', 'NOX_RICHMOND', 'NOX_ROUSE HILL', 'NOX_ST MARYS', 'NO_PARRAMATTA NORTH', 'NO_PENRITH', 'NO_PROSPECT', 'NO_RICHMOND', 'NO_ROUSE HILL', 'NO_ST MARYS', 'OZONE_PARRAMATTA NORTH', 'OZONE_PENRITH', 'OZONE_PROSPECT', 'OZONE_RICHMOND', 'OZONE_ROUSE HILL', 'OZONE_ST MARYS', 'PM10_PARRAMATTA NORTH', 'PM10_PENRITH', 'PM10_PROSPECT', 'PM10_RICHMOND', 'PM10_ROUSE HILL', 'PM10_ST MARYS', 'PM2.5_PARRAMATTA NORTH', 'PM2.5_PENRITH', 'PM2.5_PROSPECT', 'PM2.5_RICHMOND', 'PM2.5_ROUSE HILL', 'PM2.5_ST MARYS', 'RAIN_PARRAMATTA NORTH', 'RAIN_PENRITH', 'RAIN_RICHMOND', 'RAIN_ROUSE HILL', 'SOLAR_PROSPECT', 'TEMP_PARRAMATTA NORTH', 'TEMP_PENRITH', 'TEMP_PROSPECT', 'TEMP_RICHMOND', 'TEMP_ROUSE HILL', 'TEMP_ST MARYS', 'WDR_PARRAMATTA NORTH', 'WDR_PENRITH', 'WDR_PROSPECT', 'WDR_RICHMOND', 'WDR_ROUSE HILL', 'WDR_ST MARYS', 'WSP_PARRAMATTA NORTH', 'WSP_PENRITH', 'WSP_PROSPECT', 'WSP_RICHMOND', 'WSP_ROUSE HILL', 'WSP_ST MARYS']
+2026-08-20 22:09:17,983 - INFO - 
+Allobs_processed_DPE_station_api_Lower_Hunter_ALL.csv:
+2026-08-20 22:09:17,984 - INFO -   Rows: 100
+2026-08-20 22:09:17,984 - INFO -   Columns: ['datetime', 'CO_NEWCASTLE', 'HUMID_BERESFIELD', 'HUMID_NEWCASTLE', 'HUMID_WALLSEND', 'NEPH_BERESFIELD', 'NEPH_NEWCASTLE', 'NEPH_WALLSEND', 'NO2_BERESFIELD', 'NO2_NEWCASTLE', 'NO2_WALLSEND', 'NOX_BERESFIELD', 'NOX_NEWCASTLE', 'NOX_WALLSEND', 'NO_BERESFIELD', 'NO_NEWCASTLE', 'NO_WALLSEND', 'OZONE_BERESFIELD', 'OZONE_NEWCASTLE', 'OZONE_WALLSEND', 'PM10_BERESFIELD', 'PM10_NEWCASTLE', 'PM10_WALLSEND', 'PM2.5_BERESFIELD', 'PM2.5_NEWCASTLE', 'PM2.5_WALLSEND', 'RAIN_BERESFIELD', 'RAIN_NEWCASTLE', 'RAIN_WALLSEND', 'SOLAR_WALLSEND', 'TEMP_BERESFIELD', 'TEMP_NEWCASTLE', 'TEMP_WALLSEND', 'WDR_BERESFIELD', 'WDR_NEWCASTLE', 'WDR_WALLSEND', 'WSP_BERESFIELD', 'WSP_NEWCASTLE', 'WSP_WALLSEND']
+2026-08-20 22:09:18,013 - INFO - 
+Allobs_processed_DPE_station_api_Upper_Hunter_ALL.csv:
+2026-08-20 22:09:18,014 - INFO -   Rows: 100
+2026-08-20 22:09:18,014 - INFO -   Columns: ['datetime', 'CO_MERRIWA', 'CO_MUSWELLBROOK', 'HUMID_ABERDEEN', 'HUMID_BULGA', 'HUMID_CAMBERWELL', 'HUMID_JERRYS PLAINS', 'HUMID_MAISON DIEU', 'HUMID_MERRIWA', 'HUMID_MOUNT THORLEY', 'HUMID_MUSWELLBROOK', 'HUMID_MUSWELLBROOK NW', 'HUMID_SINGLETON', 'HUMID_SINGLETON NW', 'HUMID_SINGLETON SOUTH', 'HUMID_WARKWORTH', 'HUMID_WYBONG', 'NEPH_MERRIWA', 'NO2_MERRIWA', 'NO2_MUSWELLBROOK', 'NO2_SINGLETON', 'NOX_MERRIWA', 'NOX_MUSWELLBROOK', 'NOX_SINGLETON', 'NO_MERRIWA', 'NO_MUSWELLBROOK', 'NO_SINGLETON', 'OZONE_MERRIWA', 'OZONE_MUSWELLBROOK', 'OZONE_SINGLETON', 'PM10_ABERDEEN', 'PM10_BULGA', 'PM10_CAMBERWELL', 'PM10_JERRYS PLAINS', 'PM10_MAISON DIEU', 'PM10_MERRIWA', 'PM10_MOUNT THORLEY', 'PM10_MUSWELLBROOK', 'PM10_MUSWELLBROOK NW', 'PM10_SINGLETON', 'PM10_SINGLETON NW', 'PM10_SINGLETON SOUTH', 'PM10_WARKWORTH', 'PM10_WYBONG', 'PM2.5_CAMBERWELL', 'PM2.5_MERRIWA', 'PM2.5_MUSWELLBROOK', 'PM2.5_SINGLETON', 'RAIN_ABERDEEN', 'RAIN_BULGA', 'RAIN_CAMBERWELL', 'RAIN_MERRIWA', 'RAIN_MUSWELLBROOK', 'RAIN_SINGLETON', 'RAIN_WARKWORTH', 'SOLAR_MERRIWA', 'TEMP_ABERDEEN', 'TEMP_BULGA', 'TEMP_CAMBERWELL', 'TEMP_JERRYS PLAINS', 'TEMP_MAISON DIEU', 'TEMP_MERRIWA', 'TEMP_MOUNT THORLEY', 'TEMP_MUSWELLBROOK', 'TEMP_MUSWELLBROOK NW', 'TEMP_SINGLETON', 'TEMP_SINGLETON NW', 'TEMP_SINGLETON SOUTH', 'TEMP_WARKWORTH', 'TEMP_WYBONG', 'WDR_ABERDEEN', 'WDR_BULGA', 'WDR_CAMBERWELL', 'WDR_JERRYS PLAINS', 'WDR_MAISON DIEU', 'WDR_MERRIWA', 'WDR_MOUNT THORLEY', 'WDR_MUSWELLBROOK', 'WDR_MUSWELLBROOK NW', 'WDR_SINGLETON', 'WDR_SINGLETON NW', 'WDR_SINGLETON SOUTH', 'WDR_WARKWORTH', 'WDR_WYBONG', 'WSP_ABERDEEN', 'WSP_BULGA', 'WSP_CAMBERWELL', 'WSP_JERRYS PLAINS', 'WSP_MAISON DIEU', 'WSP_MERRIWA', 'WSP_MOUNT THORLEY', 'WSP_MUSWELLBROOK', 'WSP_MUSWELLBROOK NW', 'WSP_SINGLETON', 'WSP_SINGLETON NW', 'WSP_SINGLETON SOUTH', 'WSP_WARKWORTH', 'WSP_WYBONG']
+2026-08-20 22:09:22,608 - INFO - Loaded Stage 3 best features from 2 target-specific CSV(s): ['/mnt/scratch_lustre/ar_ai4ba_scratch/Ai4BetterAir/AQUISTIL/code/frozen_inputs/aquistil_development_ablation_2026_08_16/stage3_PM10.csv', '/mnt/scratch_lustre/ar_ai4ba_scratch/Ai4BetterAir/AQUISTIL/code/frozen_inputs/aquistil_development_ablation_2026_08_16/stage3_PM2.5.csv']
+2026-08-20 22:09:22,608 - INFO - Loaded 8 Stage 3 best region/target configuration(s)
+2026-08-20 22:09:22,614 - WARNING - Configured regions missing from wide input directory /mnt/scratch_lustre/ar_ai4ba_scratch/Ai4BetterAir/AQUISTIL/API_Input/Inputs: Mid-North Coast, Illawarra
+2026-08-20 22:09:23,595 - INFO - Hourly grid Sydney_North_west/PARRAMATTA NORTH | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:09:25,475 - INFO - Hourly grid Sydney_North_west/PENRITH | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:09:26,559 - INFO - Hourly grid Sydney_North_west/PROSPECT | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:09:27,649 - INFO - Hourly grid Sydney_North_west/RICHMOND | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:09:28,683 - INFO - Hourly grid Sydney_North_west/ROUSE HILL | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:09:29,771 - INFO - Hourly grid Sydney_North_west/ST MARYS | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:09:30,870 - INFO - Hourly grid Sydney_South_west/BARGO | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:09:31,883 - INFO - Hourly grid Sydney_South_west/BRINGELLY | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:09:32,953 - INFO - Hourly grid Sydney_South_west/CAMDEN | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:09:34,024 - INFO - Hourly grid Sydney_South_west/CAMPBELLTOWN WEST | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:09:35,184 - INFO - Hourly grid Sydney_South_west/LIVERPOOL | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:09:36,266 - INFO - Hourly grid Sydney_South_west/OAKDALE | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:09:37,485 - INFO - Hourly grid Upper_Hunter/ABERDEEN | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:09:38,474 - INFO - Hourly grid Upper_Hunter/BULGA | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:09:39,463 - INFO - Hourly grid Upper_Hunter/CAMBERWELL | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:09:40,481 - INFO - Hourly grid Upper_Hunter/JERRYS PLAINS | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:09:41,456 - INFO - Hourly grid Upper_Hunter/MAISON DIEU | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:09:42,429 - INFO - Hourly grid Upper_Hunter/MERRIWA | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:09:43,661 - INFO - Hourly grid Upper_Hunter/MOUNT THORLEY | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:09:44,633 - INFO - Hourly grid Upper_Hunter/MUSWELLBROOK | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:09:45,839 - INFO - Hourly grid Upper_Hunter/MUSWELLBROOK NW | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:09:46,817 - INFO - Hourly grid Upper_Hunter/SINGLETON | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:09:47,912 - INFO - Hourly grid Upper_Hunter/SINGLETON NW | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:09:48,869 - INFO - Hourly grid Upper_Hunter/SINGLETON SOUTH | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:09:49,836 - INFO - Hourly grid Upper_Hunter/WARKWORTH | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:09:50,824 - INFO - Hourly grid Upper_Hunter/WYBONG | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:09:51,870 - INFO - Hourly grid Sydney_East/ALEXANDRIA | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:09:52,995 - INFO - Hourly grid Sydney_East/COOK AND PHILLIP | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:09:54,075 - INFO - Hourly grid Sydney_East/EARLWOOD | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:09:55,178 - INFO - Hourly grid Sydney_East/LIDCOMBE | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:09:56,342 - INFO - Hourly grid Sydney_East/MACQUARIE PARK | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:09:57,504 - INFO - Hourly grid Sydney_East/RANDWICK | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:09:58,629 - INFO - Hourly grid Sydney_East/ROZELLE | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:09:59,809 - INFO - Hourly grid Sydney_East/ULTIMO-UTS | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:00,580 - INFO - Hourly grid Northern_Tablelands/ARMIDALE | original_rows=46595 hourly_grid_rows=46719 inserted_timestamps=124 duplicate_timestamps=0 max_original_timestamp_gap=1 days 21:00:00
+2026-08-20 22:10:01,413 - INFO - Hourly grid Southern_Tablelands/GOULBURN | original_rows=46659 hourly_grid_rows=46719 inserted_timestamps=60 duplicate_timestamps=0 max_original_timestamp_gap=1 days 01:00:00
+2026-08-20 22:10:02,570 - INFO - Hourly grid Lower_Hunter/BERESFIELD | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:03,596 - INFO - Hourly grid Lower_Hunter/NEWCASTLE | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:04,582 - INFO - Hourly grid Lower_Hunter/WALLSEND | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:05,549 - INFO - Hourly grid Central_Tablelands/BATHURST | original_rows=46717 hourly_grid_rows=46719 inserted_timestamps=2 duplicate_timestamps=0 max_original_timestamp_gap=0 days 02:00:00
+2026-08-20 22:10:06,439 - INFO - Hourly grid Central_Tablelands/ORANGE | original_rows=46717 hourly_grid_rows=46719 inserted_timestamps=2 duplicate_timestamps=0 max_original_timestamp_gap=0 days 02:00:00
+2026-08-20 22:10:07,348 - INFO - Hourly grid Central_Coast/WYONG | original_rows=46391 hourly_grid_rows=46719 inserted_timestamps=328 duplicate_timestamps=0 max_original_timestamp_gap=3 days 23:00:00
+2026-08-20 22:10:08,049 - INFO - Prepared 42 per-site CSVs from 9 wide regional file(s) into /mnt/scratch_lustre/ar_ai4ba_scratch/Ai4BetterAir/AQUISTIL/Outputs/Imputation_Results/Inputs_PerSite/all_targets
+2026-08-20 22:10:08,049 - INFO - Spatial feature input directory set to prepared per-site cache: /mnt/scratch_lustre/ar_ai4ba_scratch/Ai4BetterAir/AQUISTIL/Outputs/Imputation_Results/Inputs_PerSite/all_targets
+2026-08-20 22:10:08,255 - INFO - Hourly grid Central_Coast/WYONG | original_rows=46391 hourly_grid_rows=46719 inserted_timestamps=328 duplicate_timestamps=0 max_original_timestamp_gap=3 days 23:00:00
+2026-08-20 22:10:09,177 - INFO - Hourly grid Central_Tablelands/BATHURST | original_rows=46717 hourly_grid_rows=46719 inserted_timestamps=2 duplicate_timestamps=0 max_original_timestamp_gap=0 days 02:00:00
+2026-08-20 22:10:09,956 - INFO - Hourly grid Central_Tablelands/ORANGE | original_rows=46717 hourly_grid_rows=46719 inserted_timestamps=2 duplicate_timestamps=0 max_original_timestamp_gap=0 days 02:00:00
+2026-08-20 22:10:10,880 - INFO - Hourly grid Lower_Hunter/BERESFIELD | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:11,886 - INFO - Hourly grid Lower_Hunter/NEWCASTLE | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:12,877 - INFO - Hourly grid Lower_Hunter/WALLSEND | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:13,874 - INFO - Hourly grid Newcastle_Local/CARRINGTON | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:14,754 - INFO - Hourly grid Newcastle_Local/MAYFIELD | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:15,656 - INFO - Hourly grid Newcastle_Local/STOCKTON | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:16,487 - INFO - Hourly grid Northern_Tablelands/ARMIDALE | original_rows=46595 hourly_grid_rows=46719 inserted_timestamps=124 duplicate_timestamps=0 max_original_timestamp_gap=1 days 21:00:00
+2026-08-20 22:10:17,280 - INFO - Hourly grid Southern_Tablelands/GOULBURN | original_rows=46659 hourly_grid_rows=46719 inserted_timestamps=60 duplicate_timestamps=0 max_original_timestamp_gap=1 days 01:00:00
+2026-08-20 22:10:18,791 - INFO - Hourly grid Sydney/BRINGELLY | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:20,250 - INFO - Hourly grid Sydney/CAMDEN | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:21,781 - INFO - Hourly grid Sydney/CAMPBELLTOWN WEST | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:23,240 - INFO - Hourly grid Sydney/COOK AND PHILLIP | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:24,627 - INFO - Hourly grid Sydney/EARLWOOD | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:26,072 - INFO - Hourly grid Sydney/LIDCOMBE | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:27,568 - INFO - Hourly grid Sydney/LIVERPOOL | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:29,049 - INFO - Hourly grid Sydney/MACQUARIE PARK | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:30,553 - INFO - Hourly grid Sydney/OAKDALE | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:32,110 - INFO - Hourly grid Sydney/PARRAMATTA NORTH | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:33,575 - INFO - Hourly grid Sydney/PENRITH | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:35,121 - INFO - Hourly grid Sydney/PROSPECT | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:36,595 - INFO - Hourly grid Sydney/RANDWICK | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:38,027 - INFO - Hourly grid Sydney/RICHMOND | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:39,459 - INFO - Hourly grid Sydney/ROUSE HILL | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:40,916 - INFO - Hourly grid Sydney/ROZELLE | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:42,360 - INFO - Hourly grid Sydney/ST MARYS | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:43,464 - INFO - Hourly grid Sydney_East/ALEXANDRIA | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:44,527 - INFO - Hourly grid Sydney_East/COOK AND PHILLIP | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:45,660 - INFO - Hourly grid Sydney_East/EARLWOOD | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:46,750 - INFO - Hourly grid Sydney_East/LIDCOMBE | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:47,903 - INFO - Hourly grid Sydney_East/MACQUARIE PARK | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:49,041 - INFO - Hourly grid Sydney_East/RANDWICK | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:50,149 - INFO - Hourly grid Sydney_East/ROZELLE | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:51,307 - INFO - Hourly grid Sydney_East/ULTIMO-UTS | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:52,239 - INFO - Hourly grid Sydney_North_west/PARRAMATTA NORTH | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:53,312 - INFO - Hourly grid Sydney_North_west/PENRITH | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:54,382 - INFO - Hourly grid Sydney_North_west/PROSPECT | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:55,517 - INFO - Hourly grid Sydney_North_west/RICHMOND | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:56,670 - INFO - Hourly grid Sydney_North_west/ROUSE HILL | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:57,739 - INFO - Hourly grid Sydney_North_west/ST MARYS | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:58,785 - INFO - Hourly grid Sydney_South_west/BARGO | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:10:59,804 - INFO - Hourly grid Sydney_South_west/BRINGELLY | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:11:00,868 - INFO - Hourly grid Sydney_South_west/CAMDEN | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:11:01,942 - INFO - Hourly grid Sydney_South_west/CAMPBELLTOWN WEST | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:11:03,026 - INFO - Hourly grid Sydney_South_west/LIVERPOOL | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:11:04,176 - INFO - Hourly grid Sydney_South_west/OAKDALE | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:11:05,316 - INFO - Hourly grid Upper_Hunter/ABERDEEN | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:11:06,288 - INFO - Hourly grid Upper_Hunter/BULGA | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:11:07,260 - INFO - Hourly grid Upper_Hunter/CAMBERWELL | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:11:08,259 - INFO - Hourly grid Upper_Hunter/JERRYS PLAINS | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:11:09,221 - INFO - Hourly grid Upper_Hunter/MAISON DIEU | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:11:10,184 - INFO - Hourly grid Upper_Hunter/MERRIWA | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:11:11,323 - INFO - Hourly grid Upper_Hunter/MOUNT THORLEY | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:11:12,282 - INFO - Hourly grid Upper_Hunter/MUSWELLBROOK | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:11:13,411 - INFO - Hourly grid Upper_Hunter/MUSWELLBROOK NW | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:11:14,382 - INFO - Hourly grid Upper_Hunter/SINGLETON | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:11:15,463 - INFO - Hourly grid Upper_Hunter/SINGLETON NW | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:11:16,405 - INFO - Hourly grid Upper_Hunter/SINGLETON SOUTH | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:11:17,367 - INFO - Hourly grid Upper_Hunter/WARKWORTH | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:11:18,333 - INFO - Hourly grid Upper_Hunter/WYBONG | original_rows=46719 hourly_grid_rows=46719 inserted_timestamps=0 duplicate_timestamps=0 max_original_timestamp_gap=0 days 01:00:00
+2026-08-20 22:11:18,852 - INFO - Prepared 45 per-site CSVs from 11 wide regional file(s) into /mnt/scratch_lustre/ar_ai4ba_scratch/Ai4BetterAir/AQUISTIL/Outputs/Imputation_Results/Inputs_IDW_Neighbors/all_targets
+2026-08-20 22:11:18,852 - INFO - Prepared 45 all-region site inputs for Stage 3-compatible IDW features
+2026-08-20 22:11:18,852 - INFO - Running ALL regimes: ['random', 'short_gap', 'medium_gap', 'long_gap', 'event']
+2026-08-20 22:11:18,852 - INFO - Sites:  ['ABERDEEN', 'ALEXANDRIA', 'ARMIDALE', 'BARGO', 'BATHURST', 'BERESFIELD', 'BRINGELLY', 'BULGA', 'CAMBERWELL', 'CAMDEN', 'CAMPBELLTOWN WEST', 'COOK AND PHILLIP', 'EARLWOOD', 'GOULBURN', 'JERRYS PLAINS', 'LIDCOMBE', 'LIVERPOOL', 'MACQUARIE PARK', 'MAISON DIEU', 'MERRIWA', 'MOUNT THORLEY', 'MUSWELLBROOK', 'MUSWELLBROOK NW', 'NEWCASTLE', 'OAKDALE', 'ORANGE', 'PARRAMATTA NORTH', 'PENRITH', 'PROSPECT', 'RANDWICK', 'RICHMOND', 'ROUSE HILL', 'ROZELLE', 'SINGLETON', 'SINGLETON NW', 'SINGLETON SOUTH', 'ST MARYS', 'ULTIMO-UTS', 'WALLSEND', 'WARKWORTH', 'WYBONG', 'WYONG']
+2026-08-20 22:11:18,852 - INFO - Models: ['AQUISTIL', 'AQUISTIL_NoHistory', 'AQUISTIL_NoHistoryNoEvent', 'AQUISTIL_NoFFill', 'AQUISTIL_NoAdaptive', 'AQUISTIL_ExogenousOnly', 'AQUISTIL_NoAQUISTILFeatures', 'LightGBM']
+2026-08-20 22:11:18,852 - INFO - Missingness levels: [5, 10, 20, 30]%
+2026-08-20 22:11:22,121 - INFO - Saved air-quality QC diagnostics: /mnt/scratch_lustre/ar_ai4ba_scratch/Ai4BetterAir/AQUISTIL/Outputs/Imputation_Results/Data_QC (12 summaries, 1316 extreme flags)
+2026-08-20 22:11:26,644 - INFO - Built IDW_Spatial_PM25 for PARRAMATTA NORTH using 46719 valid timestamps
+2026-08-20 22:11:30,457 - INFO - Built IDW_Spatial_PM25 for PENRITH using 46719 valid timestamps
+2026-08-20 22:11:34,251 - INFO - Built IDW_Spatial_PM25 for PROSPECT using 46719 valid timestamps
+2026-08-20 22:11:38,057 - INFO - Built IDW_Spatial_PM25 for RICHMOND using 46719 valid timestamps
+2026-08-20 22:11:41,861 - INFO - Built IDW_Spatial_PM25 for ROUSE HILL using 46719 valid timestamps
+2026-08-20 22:11:45,813 - INFO - Built IDW_Spatial_PM25 for ST MARYS using 46719 valid timestamps
+2026-08-20 22:11:46,192 - INFO - Saved air-quality QC diagnostics: /mnt/scratch_lustre/ar_ai4ba_scratch/Ai4BetterAir/AQUISTIL/Outputs/Imputation_Results/Data_QC (12 summaries, 1316 extreme flags)
+2026-08-20 22:11:47,878 - INFO - Saved air-quality QC diagnostics: /mnt/scratch_lustre/ar_ai4ba_scratch/Ai4BetterAir/AQUISTIL/Outputs/Imputation_Results/Data_QC (12 summaries, 1603 extreme flags)
+2026-08-20 22:11:51,699 - INFO - Built IDW_Spatial_PM25 for BARGO using 46719 valid timestamps
+2026-08-20 22:11:55,517 - INFO - Built IDW_Spatial_PM25 for BRINGELLY using 46719 valid timestamps
+2026-08-20 22:11:59,118 - INFO - Built IDW_Spatial_PM25 for CAMDEN using 46719 valid timestamps
+2026-08-20 22:12:02,970 - INFO - Built IDW_Spatial_PM25 for CAMPBELLTOWN WEST using 46719 valid timestamps
+2026-08-20 22:12:07,713 - INFO - Built IDW_Spatial_PM25 for LIVERPOOL using 46719 valid timestamps
+2026-08-20 22:12:11,360 - INFO - Built IDW_Spatial_PM25 for OAKDALE using 46719 valid timestamps
+2026-08-20 22:12:11,775 - INFO - Saved air-quality QC diagnostics: /mnt/scratch_lustre/ar_ai4ba_scratch/Ai4BetterAir/AQUISTIL/Outputs/Imputation_Results/Data_QC (12 summaries, 1603 extreme flags)
+2026-08-20 22:12:11,776 - WARNING - No Stage 3 feature selection for region Upper_Hunter / target PM10; borrowing Stage 3 features from Central Coast: ['HUMID', 'NEPH', 'NOX', 'OZONE', 'TEMP', 'WDR', 'Hour', 'Day', 'DayOfWeek', 'DayOfYear', 'WeekOfYear', 'SiteCode']
+2026-08-20 22:12:15,145 - INFO - Saved air-quality QC diagnostics: /mnt/scratch_lustre/ar_ai4ba_scratch/Ai4BetterAir/AQUISTIL/Outputs/Imputation_Results/Data_QC (28 summaries, 2009 extreme flags)
+2026-08-20 22:12:15,157 - INFO - Regional fallback feature coverage for Upper_Hunter / PM10: {'HUMID': 634464, 'NEPH': 45330, 'NOX': 128726, 'OZONE': 60184, 'TEMP': 643865, 'WDR': 645113, 'Hour': 654066, 'Day': 654066, 'DayOfWeek': 654066, 'DayOfYear': 654066, 'WeekOfYear': 654066}
+2026-08-20 22:12:15,157 - WARNING - No Stage 3 feature selection for region Upper_Hunter / target PM2.5; borrowing Stage 3 features from Central Coast: ['CO', 'HUMID', 'NEPH', 'NO', 'NO2', 'PM10', 'TEMP', 'Hour', 'Day', 'DayOfWeek', 'DayOfYear', 'WeekOfYear', 'IDW_Spatial_PM25', 'SiteCode']
+2026-08-20 22:12:16,295 - INFO - Built IDW_Spatial_PM25 for ABERDEEN using 46716 valid timestamps
+2026-08-20 22:12:18,701 - INFO - Built IDW_Spatial_PM25 for BULGA using 46719 valid timestamps
+2026-08-20 22:12:20,998 - INFO - Built IDW_Spatial_PM25 for CAMBERWELL using 46719 valid timestamps
+2026-08-20 22:12:23,215 - INFO - Built IDW_Spatial_PM25 for JERRYS PLAINS using 46719 valid timestamps
+2026-08-20 22:12:25,619 - INFO - Built IDW_Spatial_PM25 for MAISON DIEU using 46719 valid timestamps
+2026-08-20 22:12:26,612 - INFO - Built IDW_Spatial_PM25 for MERRIWA using 46711 valid timestamps
+2026-08-20 22:12:28,998 - INFO - Built IDW_Spatial_PM25 for MOUNT THORLEY using 46719 valid timestamps
+2026-08-20 22:12:30,167 - INFO - Built IDW_Spatial_PM25 for MUSWELLBROOK using 46719 valid timestamps
+2026-08-20 22:12:31,486 - INFO - Built IDW_Spatial_PM25 for MUSWELLBROOK NW using 46719 valid timestamps
+2026-08-20 22:12:33,835 - INFO - Built IDW_Spatial_PM25 for SINGLETON using 46719 valid timestamps
+2026-08-20 22:12:36,213 - INFO - Built IDW_Spatial_PM25 for SINGLETON NW using 46719 valid timestamps
+2026-08-20 22:12:38,647 - INFO - Built IDW_Spatial_PM25 for SINGLETON SOUTH using 46719 valid timestamps
+2026-08-20 22:12:41,058 - INFO - Built IDW_Spatial_PM25 for WARKWORTH using 46719 valid timestamps
+2026-08-20 22:12:42,192 - INFO - Built IDW_Spatial_PM25 for WYBONG using 46716 valid timestamps
+2026-08-20 22:12:42,791 - INFO - Saved air-quality QC diagnostics: /mnt/scratch_lustre/ar_ai4ba_scratch/Ai4BetterAir/AQUISTIL/Outputs/Imputation_Results/Data_QC (28 summaries, 2009 extreme flags)
+2026-08-20 22:12:42,804 - INFO - Regional fallback feature coverage for Upper_Hunter / PM2.5: {'CO': 44041, 'HUMID': 634464, 'NEPH': 45330, 'NO': 128726, 'NO2': 128726, 'PM10': 640606, 'TEMP': 643865, 'Hour': 654066, 'Day': 654066, 'DayOfWeek': 654066, 'DayOfYear': 654066, 'WeekOfYear': 654066, 'IDW_Spatial_PM25': 654052}
+2026-08-20 22:12:42,804 - WARNING - No Stage 3 feature selection for region Sydney_East / target PM10; borrowing Stage 3 features from Central Coast: ['HUMID', 'NEPH', 'NOX', 'OZONE', 'TEMP', 'WDR', 'Hour', 'Day', 'DayOfWeek', 'DayOfYear', 'WeekOfYear', 'SiteCode']
+2026-08-20 22:12:44,941 - INFO - Saved air-quality QC diagnostics: /mnt/scratch_lustre/ar_ai4ba_scratch/Ai4BetterAir/AQUISTIL/Outputs/Imputation_Results/Data_QC (16 summaries, 1502 extreme flags)
+2026-08-20 22:12:44,949 - INFO - Regional fallback feature coverage for Sydney_East / PM10: {'HUMID': 324278, 'NEPH': 320478, 'NOX': 300637, 'OZONE': 303652, 'TEMP': 324280, 'WDR': 250465, 'Hour': 373752, 'Day': 373752, 'DayOfWeek': 373752, 'DayOfYear': 373752, 'WeekOfYear': 373752}
+2026-08-20 22:12:44,949 - WARNING - No Stage 3 feature selection for region Sydney_East / target PM2.5; borrowing Stage 3 features from Central Coast: ['CO', 'HUMID', 'NEPH', 'NO', 'NO2', 'PM10', 'TEMP', 'Hour', 'Day', 'DayOfWeek', 'DayOfYear', 'WeekOfYear', 'IDW_Spatial_PM25', 'SiteCode']
+2026-08-20 22:12:48,804 - INFO - Built IDW_Spatial_PM25 for ALEXANDRIA using 46719 valid timestamps
+2026-08-20 22:12:52,649 - INFO - Built IDW_Spatial_PM25 for COOK AND PHILLIP using 46719 valid timestamps
+2026-08-20 22:12:56,568 - INFO - Built IDW_Spatial_PM25 for EARLWOOD using 46719 valid timestamps
+2026-08-20 22:13:00,395 - INFO - Built IDW_Spatial_PM25 for LIDCOMBE using 46719 valid timestamps
+2026-08-20 22:13:04,265 - INFO - Built IDW_Spatial_PM25 for MACQUARIE PARK using 46719 valid timestamps
+2026-08-20 22:13:08,101 - INFO - Built IDW_Spatial_PM25 for RANDWICK using 46719 valid timestamps
+2026-08-20 22:13:11,920 - INFO - Built IDW_Spatial_PM25 for ROZELLE using 46719 valid timestamps
+2026-08-20 22:13:15,740 - INFO - Built IDW_Spatial_PM25 for ULTIMO-UTS using 46719 valid timestamps
+2026-08-20 22:13:16,219 - INFO - Saved air-quality QC diagnostics: /mnt/scratch_lustre/ar_ai4ba_scratch/Ai4BetterAir/AQUISTIL/Outputs/Imputation_Results/Data_QC (16 summaries, 1502 extreme flags)
+2026-08-20 22:13:16,228 - INFO - Regional fallback feature coverage for Sydney_East / PM2.5: {'CO': 208227, 'HUMID': 324278, 'NEPH': 320478, 'NO': 300637, 'NO2': 300637, 'PM10': 311841, 'TEMP': 324280, 'Hour': 373752, 'Day': 373752, 'DayOfWeek': 373752, 'DayOfYear': 373752, 'WeekOfYear': 373752, 'IDW_Spatial_PM25': 373752}
+2026-08-20 22:13:16,228 - WARNING - No Stage 3 feature selection for region Northern_Tablelands / target PM10; borrowing Stage 3 features from Central Coast: ['HUMID', 'NEPH', 'NOX', 'OZONE', 'TEMP', 'WDR', 'Hour', 'Day', 'DayOfWeek', 'DayOfYear', 'WeekOfYear', 'SiteCode']
+2026-08-20 22:13:16,729 - INFO - Saved air-quality QC diagnostics: /mnt/scratch_lustre/ar_ai4ba_scratch/Ai4BetterAir/AQUISTIL/Outputs/Imputation_Results/Data_QC (2 summaries, 1552 extreme flags)
+2026-08-20 22:13:16,732 - INFO - Regional fallback feature coverage for Northern_Tablelands / PM10: {'HUMID': 46530, 'NEPH': 44858, 'TEMP': 46530, 'WDR': 46500, 'Hour': 46719, 'Day': 46719, 'DayOfWeek': 46719, 'DayOfYear': 46719, 'WeekOfYear': 46719}
+2026-08-20 22:13:16,732 - WARNING - No Stage 3 feature selection for region Northern_Tablelands / target PM2.5; borrowing Stage 3 features from Central Coast: ['CO', 'HUMID', 'NEPH', 'NO', 'NO2', 'PM10', 'TEMP', 'Hour', 'Day', 'DayOfWeek', 'DayOfYear', 'WeekOfYear', 'IDW_Spatial_PM25', 'SiteCode']
+2026-08-20 22:13:16,994 - INFO - Built IDW_Spatial_PM25 for ARMIDALE using 0 valid timestamps
+2026-08-20 22:13:17,322 - INFO - Saved air-quality QC diagnostics: /mnt/scratch_lustre/ar_ai4ba_scratch/Ai4BetterAir/AQUISTIL/Outputs/Imputation_Results/Data_QC (2 summaries, 1552 extreme flags)
+2026-08-20 22:13:17,325 - INFO - Regional fallback feature coverage for Northern_Tablelands / PM2.5: {'HUMID': 46530, 'NEPH': 44858, 'PM10': 45920, 'TEMP': 46530, 'Hour': 46719, 'Day': 46719, 'DayOfWeek': 46719, 'DayOfYear': 46719, 'WeekOfYear': 46719, 'IDW_Spatial_PM25': 0}
+2026-08-20 22:13:17,325 - WARNING - No Stage 3 feature selection for region Southern_Tablelands / target PM10; borrowing Stage 3 features from Central Coast: ['HUMID', 'NEPH', 'NOX', 'OZONE', 'TEMP', 'WDR', 'Hour', 'Day', 'DayOfWeek', 'DayOfYear', 'WeekOfYear', 'SiteCode']
+2026-08-20 22:13:17,681 - INFO - Saved air-quality QC diagnostics: /mnt/scratch_lustre/ar_ai4ba_scratch/Ai4BetterAir/AQUISTIL/Outputs/Imputation_Results/Data_QC (2 summaries, 234 extreme flags)
+2026-08-20 22:13:17,683 - INFO - Regional fallback feature coverage for Southern_Tablelands / PM10: {'HUMID': 46640, 'NEPH': 46080, 'NOX': 43824, 'OZONE': 44048, 'TEMP': 46640, 'WDR': 45957, 'Hour': 46719, 'Day': 46719, 'DayOfWeek': 46719, 'DayOfYear': 46719, 'WeekOfYear': 46719}
+2026-08-20 22:13:17,683 - WARNING - No Stage 3 feature selection for region Southern_Tablelands / target PM2.5; borrowing Stage 3 features from Central Coast: ['CO', 'HUMID', 'NEPH', 'NO', 'NO2', 'PM10', 'TEMP', 'Hour', 'Day', 'DayOfWeek', 'DayOfYear', 'WeekOfYear', 'IDW_Spatial_PM25', 'SiteCode']
+2026-08-20 22:13:18,073 - INFO - Built IDW_Spatial_PM25 for GOULBURN using 38247 valid timestamps
+2026-08-20 22:13:18,245 - INFO - Saved air-quality QC diagnostics: /mnt/scratch_lustre/ar_ai4ba_scratch/Ai4BetterAir/AQUISTIL/Outputs/Imputation_Results/Data_QC (2 summaries, 234 extreme flags)
+2026-08-20 22:13:18,248 - INFO - Regional fallback feature coverage for Southern_Tablelands / PM2.5: {'HUMID': 46640, 'NEPH': 46080, 'NO': 43824, 'NO2': 43824, 'PM10': 45086, 'TEMP': 46640, 'Hour': 46719, 'Day': 46719, 'DayOfWeek': 46719, 'DayOfYear': 46719, 'WeekOfYear': 46719, 'IDW_Spatial_PM25': 38247}
+2026-08-20 22:13:18,248 - WARNING - No Stage 3 feature selection for region Lower_Hunter / target PM10; borrowing Stage 3 features from Central Coast: ['HUMID', 'NEPH', 'NOX', 'OZONE', 'TEMP', 'WDR', 'Hour', 'Day', 'DayOfWeek', 'DayOfYear', 'WeekOfYear', 'SiteCode']
+2026-08-20 22:13:19,238 - INFO - Saved air-quality QC diagnostics: /mnt/scratch_lustre/ar_ai4ba_scratch/Ai4BetterAir/AQUISTIL/Outputs/Imputation_Results/Data_QC (6 summaries, 647 extreme flags)
+2026-08-20 22:13:19,242 - INFO - Regional fallback feature coverage for Lower_Hunter / PM10: {'HUMID': 136706, 'NEPH': 138422, 'NOX': 129363, 'OZONE': 130600, 'TEMP': 138911, 'WDR': 138304, 'Hour': 140157, 'Day': 140157, 'DayOfWeek': 140157, 'DayOfYear': 140157, 'WeekOfYear': 140157}
+2026-08-20 22:13:19,242 - WARNING - No Stage 3 feature selection for region Lower_Hunter / target PM2.5; borrowing Stage 3 features from Central Coast: ['CO', 'HUMID', 'NEPH', 'NO', 'NO2', 'PM10', 'TEMP', 'Hour', 'Day', 'DayOfWeek', 'DayOfYear', 'WeekOfYear', 'IDW_Spatial_PM25', 'SiteCode']
+2026-08-20 22:13:21,271 - INFO - Built IDW_Spatial_PM25 for BERESFIELD using 46719 valid timestamps
+2026-08-20 22:13:23,097 - INFO - Built IDW_Spatial_PM25 for NEWCASTLE using 46719 valid timestamps
+2026-08-20 22:13:24,917 - INFO - Built IDW_Spatial_PM25 for WALLSEND using 46719 valid timestamps
+2026-08-20 22:13:25,177 - INFO - Saved air-quality QC diagnostics: /mnt/scratch_lustre/ar_ai4ba_scratch/Ai4BetterAir/AQUISTIL/Outputs/Imputation_Results/Data_QC (6 summaries, 647 extreme flags)
+2026-08-20 22:13:25,182 - INFO - Regional fallback feature coverage for Lower_Hunter / PM2.5: {'CO': 44277, 'HUMID': 136706, 'NEPH': 138422, 'NO': 129374, 'NO2': 129363, 'PM10': 137532, 'TEMP': 138911, 'Hour': 140157, 'Day': 140157, 'DayOfWeek': 140157, 'DayOfYear': 140157, 'WeekOfYear': 140157, 'IDW_Spatial_PM25': 140157}
+2026-08-20 22:13:25,841 - INFO - Saved air-quality QC diagnostics: /mnt/scratch_lustre/ar_ai4ba_scratch/Ai4BetterAir/AQUISTIL/Outputs/Imputation_Results/Data_QC (4 summaries, 927 extreme flags)
+2026-08-20 22:13:26,552 - INFO - Saved air-quality QC diagnostics: /mnt/scratch_lustre/ar_ai4ba_scratch/Ai4BetterAir/AQUISTIL/Outputs/Imputation_Results/Data_QC (4 summaries, 927 extreme flags)
+2026-08-20 22:13:26,911 - INFO - Saved air-quality QC diagnostics: /mnt/scratch_lustre/ar_ai4ba_scratch/Ai4BetterAir/AQUISTIL/Outputs/Imputation_Results/Data_QC (2 summaries, 186 extreme flags)
+2026-08-20 22:13:31,565 - INFO - Built IDW_Spatial_PM25 for WYONG using 46719 valid timestamps
+2026-08-20 22:13:31,716 - INFO - Saved air-quality QC diagnostics: /mnt/scratch_lustre/ar_ai4ba_scratch/Ai4BetterAir/AQUISTIL/Outputs/Imputation_Results/Data_QC (2 summaries, 186 extreme flags)
+2026-08-20 22:13:31,716 - INFO - Regional target parallelism: workers=10, model threads/worker=8, tasks=18
+2026-08-20 22:13:37,735 - INFO - Saved dedicated AQUISTIL ablation metrics: /mnt/scratch_lustre/ar_ai4ba_scratch/Ai4BetterAir/AQUISTIL/Outputs/Imputation_Results/Metrics_with_Ablation/aquistil_ablation_metrics.csv (18400 current rows, 64400 total rows)
+2026-08-20 22:13:38,110 - INFO - Loaded 64400 persisted rows for resumable AQUISTIL ablation tasks
+2026-08-20 22:13:38,145 - INFO - Loaded model module 'AQUISTIL' from: /mnt/scratch_lustre/ar_ai4ba_scratch/Ai4BetterAir/AQUISTIL/code/Model/AQUISTIL.py
+2026-08-20 22:13:38,145 - INFO -   - exposes impute_mice: True
+2026-08-20 22:13:38,145 - INFO -   - MODEL_NAME attribute: AQUISTIL
+2026-08-20 22:13:38,145 - INFO - Using imputation function 'impute_mice' from module 'AQUISTIL'
+2026-08-20 22:13:38,463 - INFO - Skipping complete ablation task: Sydney_North_west/PM10/AQUISTIL
+2026-08-20 22:13:38,756 - INFO - Skipping complete ablation task: Sydney_North_west/PM2.5/AQUISTIL
+2026-08-20 22:13:39,050 - INFO - Skipping complete ablation task: Sydney_South_west/PM10/AQUISTIL
+2026-08-20 22:13:39,334 - INFO - Skipping complete ablation task: Sydney_South_west/PM2.5/AQUISTIL
+2026-08-20 22:13:40,983 - INFO - Skipping complete ablation task: Central_Tablelands/PM10/AQUISTIL
+2026-08-20 22:13:41,256 - INFO - Skipping complete ablation task: Central_Tablelands/PM2.5/AQUISTIL
+2026-08-20 22:13:41,526 - INFO - Skipping complete ablation task: Central_Coast/PM10/AQUISTIL
+2026-08-20 22:13:41,796 - INFO - Skipping complete ablation task: Central_Coast/PM2.5/AQUISTIL
+2026-08-20 22:13:41,797 - INFO - Running 10 regional AQUISTIL tasks with 10 target workers
+2026-08-20 22:13:42,089 - INFO - random 5% seed=13 per-site artificial counts: {'GOULBURN': 2255}
+2026-08-20 22:13:42,098 - INFO - random 5% seed=13 per-site artificial counts: {'ARMIDALE': 2309}
+2026-08-20 22:13:42,098 - INFO - random 5% seed=13 per-site artificial counts: {'GOULBURN': 2254}
+2026-08-20 22:13:42,099 - INFO - random 5% seed=13 per-site artificial counts: {'ARMIDALE': 2296}
+2026-08-20 22:13:42,301 - INFO - Regional task Northern Tablelands/PM2.5/AQUISTIL | random 5% seed=13 | masked=2309 eligible_sites=1
+2026-08-20 22:13:42,306 - INFO - Regional task Southern Tablelands/PM2.5/AQUISTIL | random 5% seed=13 | masked=2255 eligible_sites=1
+2026-08-20 22:13:42,308 - INFO - Regional task Southern Tablelands/PM10/AQUISTIL | random 5% seed=13 | masked=2254 eligible_sites=1
+2026-08-20 22:13:42,310 - INFO - Regional task Northern Tablelands/PM10/AQUISTIL | random 5% seed=13 | masked=2296 eligible_sites=1
+2026-08-20 22:13:42,341 - INFO - Preparing spatial-temporal data...
+2026-08-20 22:13:42,363 - INFO - Preparing spatial-temporal data...
+2026-08-20 22:13:42,395 - INFO - Preparing spatial-temporal data...
+2026-08-20 22:13:42,396 - INFO - Preparing spatial-temporal data...
+2026-08-20 22:13:42,412 - WARNING - Skipping 10 regional study site(s) with no observed PM2.5 values for Upper Hunter/AQUISTIL: ABERDEEN, BULGA, JERRYS PLAINS, MAISON DIEU, MOUNT THORLEY, MUSWELLBROOK NW, SINGLETON NW, SINGLETON SOUTH, WARKWORTH, WYBONG
+2026-08-20 22:13:42,442 - INFO - Shared preprocessing prepared 10 features; model-specific features may be added after this stage.
+2026-08-20 22:13:42,445 - INFO - Shared preprocessing prepared 10 features; model-specific features may be added after this stage.
+2026-08-20 22:13:42,454 - INFO - Shared preprocessing prepared 13 features; model-specific features may be added after this stage.
+2026-08-20 22:13:42,455 - INFO - Shared preprocessing prepared 12 features; model-specific features may be added after this stage.
+2026-08-20 22:13:42,743 - INFO - random 5% seed=13 per-site artificial counts: {'BERESFIELD': 2286, 'NEWCASTLE': 2304, 'WALLSEND': 2286}
+2026-08-20 22:13:42,748 - INFO - random 5% seed=13 per-site artificial counts: {'BERESFIELD': 2274, 'NEWCASTLE': 2281, 'WALLSEND': 2260}
+2026-08-20 22:13:42,880 - INFO - [AQUISTIL] adaptive spatial contributors=1
+2026-08-20 22:13:42,887 - INFO - Regional task Lower Hunter/PM10/AQUISTIL | random 5% seed=13 | masked=6876 eligible_sites=3
+2026-08-20 22:13:42,892 - INFO - Regional task Lower Hunter/PM2.5/AQUISTIL | random 5% seed=13 | masked=6815 eligible_sites=3
+2026-08-20 22:13:42,962 - INFO - Preparing spatial-temporal data...
+2026-08-20 22:13:42,975 - INFO - Preparing spatial-temporal data...
+2026-08-20 22:13:42,977 - INFO - [AQUISTIL] adaptive spatial contributors=0
+2026-08-20 22:13:42,977 - INFO - [AQUISTIL] adaptive spatial contributors=0
+2026-08-20 22:13:42,979 - INFO - [AQUISTIL] adaptive spatial contributors=0
+2026-08-20 22:13:43,198 - INFO - Shared preprocessing prepared 12 features; model-specific features may be added after this stage.
+2026-08-20 22:13:43,225 - INFO - Shared preprocessing prepared 14 features; model-specific features may be added after this stage.
+2026-08-20 22:13:43,418 - INFO - [AQUISTIL] adaptive spatial contributors=1
+2026-08-20 22:13:43,587 - INFO - random 5% seed=13 per-site artificial counts: {'CAMBERWELL': 2241, 'MERRIWA': 2194, 'MUSWELLBROOK': 2314, 'SINGLETON': 2095}
+2026-08-20 22:13:43,788 - INFO - Regional task Upper Hunter/PM2.5/AQUISTIL | random 5% seed=13 | masked=8844 eligible_sites=4
+2026-08-20 22:13:43,841 - INFO - Preparing spatial-temporal data...
+2026-08-20 22:13:43,939 - INFO - Shared preprocessing prepared 14 features; model-specific features may be added after this stage.
+2026-08-20 22:13:44,034 - INFO - random 5% seed=13 per-site artificial counts: {'ALEXANDRIA': 1646, 'COOK AND PHILLIP': 2184, 'EARLWOOD': 2291, 'LIDCOMBE': 2232, 'MACQUARIE PARK': 2284, 'RANDWICK': 2275, 'ROZELLE': 2277, 'ULTIMO-UTS': 314}
+2026-08-20 22:13:44,049 - INFO - random 5% seed=13 per-site artificial counts: {'ALEXANDRIA': 1647, 'COOK AND PHILLIP': 2186, 'EARLWOOD': 2294, 'LIDCOMBE': 2304, 'MACQUARIE PARK': 2258, 'RANDWICK': 2296, 'ROZELLE': 2284, 'ULTIMO-UTS': 323}
+2026-08-20 22:13:44,377 - INFO - Regional task Sydney East/PM2.5/AQUISTIL | random 5% seed=13 | masked=15503 eligible_sites=8
+2026-08-20 22:13:44,411 - INFO - Regional task Sydney East/PM10/AQUISTIL | random 5% seed=13 | masked=15592 eligible_sites=8
+2026-08-20 22:13:44,419 - INFO - [AQUISTIL] adaptive spatial contributors=6
+2026-08-20 22:13:44,420 - INFO - [AQUISTIL] adaptive spatial contributors=1
+2026-08-20 22:13:44,474 - INFO - Preparing spatial-temporal data...
+2026-08-20 22:13:44,553 - INFO - Preparing spatial-temporal data...
+2026-08-20 22:13:44,644 - INFO - Shared preprocessing prepared 12 features; model-specific features may be added after this stage.
+2026-08-20 22:13:44,662 - INFO - Shared preprocessing prepared 14 features; model-specific features may be added after this stage.
+2026-08-20 22:13:44,949 - INFO - [AQUISTIL] adaptive spatial contributors=1
+2026-08-20 22:13:45,272 - INFO - random 5% seed=13 per-site artificial counts: {'ABERDEEN': 2310, 'BULGA': 2293, 'CAMBERWELL': 2310, 'JERRYS PLAINS': 2296, 'MAISON DIEU': 2281, 'MERRIWA': 2264, 'MOUNT THORLEY': 2284, 'MUSWELLBROOK': 2300, 'MUSWELLBROOK NW': 2313, 'SINGLETON': 2312, 'SINGLETON NW': 2307, 'SINGLETON SOUTH': 2299, 'WARKWORTH': 2169, 'WYBONG': 2292}
+2026-08-20 22:13:45,600 - INFO - Regional task Upper Hunter/PM10/AQUISTIL | random 5% seed=13 | masked=32030 eligible_sites=14
+2026-08-20 22:13:45,744 - INFO - Preparing spatial-temporal data...
+2026-08-20 22:13:50,223 - INFO - Shared preprocessing prepared 12 features; model-specific features may be added after this stage.
+2026-08-20 22:13:58,149 - INFO - [AQUISTIL] final model feature matrix: 72 features
+2026-08-20 22:13:58,150 - INFO - [AQUISTIL] switches history=True spatial=True event_features=True event_refinement=False calendar=True site=True gap=True uncertainty=True forward_fill=True median_fill=True adaptive_guardrails=True regime_aware=True gap_threshold=2 boundary_features=False future_context=True
+2026-08-20 22:13:58,154 - INFO - [AQUISTIL]   - Selected/raw input features: 10
+2026-08-20 22:13:58,155 - INFO - [AQUISTIL]   - Spatial features: 1
+2026-08-20 22:13:58,156 - INFO - [AQUISTIL]   - Calendar features: 12
+2026-08-20 22:13:58,157 - INFO - [AQUISTIL]   - Lag features and availability flags: 14
+2026-08-20 22:13:58,159 - INFO - [AQUISTIL]   - Rolling features: 16
+2026-08-20 22:13:58,160 - INFO - [AQUISTIL]   - Derived history/event/gap features: 18
+2026-08-20 22:13:58,247 - INFO - [AQUISTIL] final model feature matrix: 72 features
+2026-08-20 22:13:58,248 - INFO - [AQUISTIL] switches history=True spatial=True event_features=True event_refinement=False calendar=True site=True gap=True uncertainty=True forward_fill=True median_fill=True adaptive_guardrails=True regime_aware=True gap_threshold=2 boundary_features=False future_context=True
+2026-08-20 22:13:58,253 - INFO - [AQUISTIL]   - Selected/raw input features: 10
+2026-08-20 22:13:58,254 - INFO - [AQUISTIL]   - Spatial features: 1
+2026-08-20 22:13:58,257 - INFO - [AQUISTIL]   - Calendar features: 12
+2026-08-20 22:13:58,259 - INFO - [AQUISTIL] final model feature matrix: 74 features
+2026-08-20 22:13:58,261 - INFO - [AQUISTIL]   - Lag features and availability flags: 14
+2026-08-20 22:13:58,261 - INFO - [AQUISTIL] switches history=True spatial=True event_features=True event_refinement=False calendar=True site=True gap=True uncertainty=True forward_fill=True median_fill=True adaptive_guardrails=True regime_aware=True gap_threshold=2 boundary_features=False future_context=True
+2026-08-20 22:13:58,263 - INFO - [AQUISTIL]   - Rolling features: 16
+2026-08-20 22:13:58,265 - INFO - [AQUISTIL]   - Selected/raw input features: 12
+2026-08-20 22:13:58,266 - INFO - [AQUISTIL]   - Derived history/event/gap features: 18
+2026-08-20 22:13:58,266 - INFO - [AQUISTIL]   - Spatial features: 1
+2026-08-20 22:13:58,268 - INFO - [AQUISTIL]   - Calendar features: 12
+2026-08-20 22:13:58,269 - INFO - [AQUISTIL]   - Lag features and availability flags: 14
+2026-08-20 22:13:58,270 - INFO - [AQUISTIL]   - Rolling features: 16
+2026-08-20 22:13:58,270 - INFO - [AQUISTIL]   - Derived history/event/gap features: 18
+2026-08-20 22:13:58,278 - INFO - [AQUISTIL] final model feature matrix: 77 features
+2026-08-20 22:13:58,279 - INFO - [AQUISTIL] switches history=True spatial=True event_features=True event_refinement=False calendar=True site=True gap=True uncertainty=True forward_fill=True median_fill=True adaptive_guardrails=True regime_aware=True gap_threshold=2 boundary_features=False future_context=True
+2026-08-20 22:13:58,281 - INFO - [AQUISTIL]   - Selected/raw input features: 15
+2026-08-20 22:13:58,282 - INFO - [AQUISTIL]   - Spatial features: 3
+2026-08-20 22:13:58,283 - INFO - [AQUISTIL]   - Calendar features: 12
+2026-08-20 22:13:58,283 - INFO - [AQUISTIL]   - Lag features and availability flags: 14
+2026-08-20 22:13:58,284 - INFO - [AQUISTIL]   - Rolling features: 16
+2026-08-20 22:13:58,285 - INFO - [AQUISTIL]   - Derived history/event/gap features: 18
+2026-08-20 22:13:58,560 - INFO - [AQUISTIL] adaptive spatial contributors=56
+2026-08-20 22:14:13,400 - INFO - [AQUISTIL] topology router threshold=2h history_rows=2097 gap_rows=753
+2026-08-20 22:14:13,909 - INFO - [AQUISTIL] topology router threshold=2h history_rows=2102 gap_rows=993
+2026-08-20 22:14:14,375 - INFO - [AQUISTIL] topology router threshold=2h history_rows=2034 gap_rows=1836
+2026-08-20 22:14:14,499 - INFO - [AQUISTIL] topology router threshold=2h history_rows=2040 gap_rows=1847
+2026-08-20 22:14:29,247 - INFO - [AQUISTIL] final model feature matrix: 78 features
+2026-08-20 22:14:29,424 - INFO - [AQUISTIL] switches history=True spatial=True event_features=True event_refinement=False calendar=True site=True gap=True uncertainty=True forward_fill=True median_fill=True adaptive_guardrails=True regime_aware=True gap_threshold=2 boundary_features=False future_context=True
+2026-08-20 22:14:29,513 - INFO - [AQUISTIL]   - Selected/raw input features: 16
+2026-08-20 22:14:29,646 - INFO - [AQUISTIL]   - Spatial features: 3
+2026-08-20 22:14:29,736 - INFO - [AQUISTIL]   - Calendar features: 12
+2026-08-20 22:14:29,922 - INFO - [AQUISTIL]   - Lag features and availability flags: 14
+2026-08-20 22:14:30,171 - INFO - [AQUISTIL]   - Rolling features: 16
+2026-08-20 22:14:30,297 - INFO - [AQUISTIL]   - Derived history/event/gap features: 18
+2026-08-20 22:14:35,273 - INFO - [AQUISTIL] final model feature matrix: 76 features
+2026-08-20 22:14:35,275 - INFO - [AQUISTIL] switches history=True spatial=True event_features=True event_refinement=False calendar=True site=True gap=True uncertainty=True forward_fill=True median_fill=True adaptive_guardrails=True regime_aware=True gap_threshold=2 boundary_features=False future_context=True
+2026-08-20 22:14:35,276 - INFO - [AQUISTIL]   - Selected/raw input features: 14
+2026-08-20 22:14:35,277 - INFO - [AQUISTIL]   - Spatial features: 2
+2026-08-20 22:14:35,278 - INFO - [AQUISTIL]   - Calendar features: 12
+2026-08-20 22:14:35,279 - INFO - [AQUISTIL]   - Lag features and availability flags: 14
+2026-08-20 22:14:35,280 - INFO - [AQUISTIL]   - Rolling features: 16
+2026-08-20 22:14:35,281 - INFO - [AQUISTIL]   - Derived history/event/gap features: 18
+2026-08-20 22:14:35,385 - INFO - [AQUISTIL_Northern_Tablelands] adaptive QA enabled=True valid_spatial_references=0 active_blend_rows=0/2850 mean_blend=0.000000 max_blend=0.000000
+2026-08-20 22:14:35,387 - INFO - [AQUISTIL_Northern_Tablelands] adaptive gap guardrail target=PM2.5 regime=random active_rows=0/2850 mean_blend=0.000
+2026-08-20 22:14:35,437 - INFO - [AQUISTIL_Southern_Tablelands] adaptive QA enabled=True valid_spatial_references=0 active_blend_rows=0/3870 mean_blend=0.000000 max_blend=0.000000
+2026-08-20 22:14:35,439 - INFO - [AQUISTIL_Southern_Tablelands] adaptive gap guardrail target=PM2.5 regime=random active_rows=0/3870 mean_blend=0.000
+2026-08-20 22:14:35,547 - INFO - [AQUISTIL_Northern_Tablelands] adaptive QA enabled=True valid_spatial_references=0 active_blend_rows=0/3095 mean_blend=0.000000 max_blend=0.000000
+2026-08-20 22:14:35,548 - INFO - [AQUISTIL_Northern_Tablelands] adaptive gap guardrail target=PM10 regime=random active_rows=0/3095 mean_blend=0.000
+2026-08-20 22:14:35,816 - INFO - [AQUISTIL_Southern_Tablelands] adaptive QA enabled=True valid_spatial_references=0 active_blend_rows=0/3887 mean_blend=0.000000 max_blend=0.000000
+2026-08-20 22:14:35,817 - INFO - [AQUISTIL_Southern_Tablelands] adaptive gap guardrail target=PM10 regime=random active_rows=0/3887 mean_blend=0.000
+2026-08-20 22:14:35,835 - INFO - Completed regional task Northern Tablelands/PM2.5/AQUISTIL | random 5% seed=13 | RMSE=2.1060 R2=0.9523
+2026-08-20 22:14:35,846 - INFO - Completed regional task Southern Tablelands/PM2.5/AQUISTIL | random 5% seed=13 | RMSE=1.4765 R2=0.9143
+2026-08-20 22:14:35,868 - INFO - Completed regional task Northern Tablelands/PM10/AQUISTIL | random 5% seed=13 | RMSE=3.6728 R2=0.8802
+2026-08-20 22:14:36,004 - INFO - random 5% seed=29 per-site artificial counts: {'ARMIDALE': 2309}
+2026-08-20 22:14:36,174 - INFO - Regional task Northern Tablelands/PM2.5/AQUISTIL | random 5% seed=29 | masked=2309 eligible_sites=1
+2026-08-20 22:14:36,178 - INFO - random 5% seed=29 per-site artificial counts: {'GOULBURN': 2255}
+2026-08-20 22:14:36,186 - INFO - random 5% seed=29 per-site artificial counts: {'ARMIDALE': 2296}
+2026-08-20 22:14:36,249 - INFO - Preparing spatial-temporal data...
+2026-08-20 22:14:36,431 - INFO - Regional task Northern Tablelands/PM10/AQUISTIL | random 5% seed=29 | masked=2296 eligible_sites=1
+2026-08-20 22:14:36,435 - INFO - Regional task Southern Tablelands/PM2.5/AQUISTIL | random 5% seed=29 | masked=2255 eligible_sites=1
+2026-08-20 22:14:36,664 - INFO - Preparing spatial-temporal data...
+2026-08-20 22:14:36,665 - INFO - Preparing spatial-temporal data...
+2026-08-20 22:14:36,669 - INFO - Shared preprocessing prepared 10 features; model-specific features may be added after this stage.
+2026-08-20 22:14:37,478 - INFO - Shared preprocessing prepared 10 features; model-specific features may be added after this stage.
+2026-08-20 22:14:37,605 - INFO - Completed regional task Southern Tablelands/PM10/AQUISTIL | random 5% seed=13 | RMSE=3.2194 R2=0.7169
+2026-08-20 22:14:37,800 - INFO - Shared preprocessing prepared 13 features; model-specific features may be added after this stage.
+2026-08-20 22:14:38,328 - INFO - [AQUISTIL] final model feature matrix: 78 features
+2026-08-20 22:14:38,355 - INFO - [AQUISTIL] switches history=True spatial=True event_features=True event_refinement=False calendar=True site=True gap=True uncertainty=True forward_fill=True median_fill=True adaptive_guardrails=True regime_aware=True gap_threshold=2 boundary_features=False future_context=True
+2026-08-20 22:14:38,359 - INFO - [AQUISTIL]   - Selected/raw input features: 16
+2026-08-20 22:14:38,404 - INFO - [AQUISTIL]   - Spatial features: 3
+2026-08-20 22:14:38,408 - INFO - [AQUISTIL]   - Calendar features: 12
+2026-08-20 22:14:38,410 - INFO - [AQUISTIL]   - Lag features and availability flags: 14
+2026-08-20 22:14:38,445 - INFO - [AQUISTIL]   - Rolling features: 16
+2026-08-20 22:14:38,447 - INFO - [AQUISTIL]   - Derived history/event/gap features: 18
+2026-08-20 22:14:38,654 - INFO - [AQUISTIL] adaptive spatial contributors=1
+2026-08-20 22:14:38,797 - INFO - [AQUISTIL] adaptive spatial contributors=0
+2026-08-20 22:14:39,241 - INFO - random 5% seed=29 per-site artificial counts: {'GOULBURN': 2254}
+2026-08-20 22:14:39,245 - INFO - [AQUISTIL] adaptive spatial contributors=0
+2026-08-20 22:14:39,694 - INFO - Regional task Southern Tablelands/PM10/AQUISTIL | random 5% seed=29 | masked=2254 eligible_sites=1
+2026-08-20 22:14:39,891 - INFO - Preparing spatial-temporal data...
+2026-08-20 22:14:40,255 - INFO - Shared preprocessing prepared 12 features; model-specific features may be added after this stage.
+2026-08-20 22:14:44,600 - INFO - [AQUISTIL] adaptive spatial contributors=0
+2026-08-20 22:14:48,282 - INFO - [AQUISTIL] topology router threshold=2h history_rows=6846 gap_rows=3829
+2026-08-20 22:14:50,760 - INFO - [AQUISTIL] topology router threshold=2h history_rows=6371 gap_rows=3130
+2026-08-20 22:15:01,149 - INFO - [AQUISTIL] topology router threshold=2h history_rows=9106 gap_rows=9730
+2026-08-20 22:15:26,666 - INFO - [AQUISTIL] final model feature matrix: 72 features
+2026-08-20 22:15:26,705 - INFO - [AQUISTIL] switches history=True spatial=True event_features=True event_refinement=False calendar=True site=True gap=True uncertainty=True forward_fill=True median_fill=True adaptive_guardrails=True regime_aware=True gap_threshold=2 boundary_features=False future_context=True
+2026-08-20 22:15:26,729 - INFO - [AQUISTIL]   - Selected/raw input features: 10
+2026-08-20 22:15:26,767 - INFO - [AQUISTIL]   - Spatial features: 1
+2026-08-20 22:15:26,804 - INFO - [AQUISTIL]   - Calendar features: 12
+2026-08-20 22:15:26,849 - INFO - [AQUISTIL]   - Lag features and availability flags: 14
+2026-08-20 22:15:26,913 - INFO - [AQUISTIL]   - Rolling features: 16
+2026-08-20 22:15:26,920 - INFO - [AQUISTIL]   - Derived history/event/gap features: 18
+2026-08-20 22:15:28,231 - INFO - [AQUISTIL] final model feature matrix: 72 features
+2026-08-20 22:15:28,248 - INFO - [AQUISTIL] switches history=True spatial=True event_features=True event_refinement=False calendar=True site=True gap=True uncertainty=True forward_fill=True median_fill=True adaptive_guardrails=True regime_aware=True gap_threshold=2 boundary_features=False future_context=True
+2026-08-20 22:15:28,330 - INFO - [AQUISTIL]   - Selected/raw input features: 10
+2026-08-20 22:15:28,369 - INFO - [AQUISTIL]   - Spatial features: 1
+2026-08-20 22:15:28,405 - INFO - [AQUISTIL]   - Calendar features: 12
+2026-08-20 22:15:28,499 - INFO - [AQUISTIL]   - Lag features and availability flags: 14
+2026-08-20 22:15:28,504 - INFO - [AQUISTIL]   - Rolling features: 16
+2026-08-20 22:15:28,593 - INFO - [AQUISTIL]   - Derived history/event/gap features: 18
+2026-08-20 22:15:29,355 - INFO - [AQUISTIL] final model feature matrix: 77 features
+2026-08-20 22:15:29,371 - INFO - [AQUISTIL] switches history=True spatial=True event_features=True event_refinement=False calendar=True site=True gap=True uncertainty=True forward_fill=True median_fill=True adaptive_guardrails=True regime_aware=True gap_threshold=2 boundary_features=False future_context=True
+2026-08-20 22:15:29,391 - INFO - [AQUISTIL]   - Selected/raw input features: 15
+2026-08-20 22:15:29,397 - INFO - [AQUISTIL]   - Spatial features: 3
+2026-08-20 22:15:29,400 - INFO - [AQUISTIL]   - Calendar features: 12
+2026-08-20 22:15:29,440 - INFO - [AQUISTIL]   - Lag features and availability flags: 14
+2026-08-20 22:15:29,490 - INFO - [AQUISTIL]   - Rolling features: 16
+2026-08-20 22:15:29,538 - INFO - [AQUISTIL]   - Derived history/event/gap features: 18
+2026-08-20 22:15:30,335 - INFO - [AQUISTIL] final model feature matrix: 74 features
+2026-08-20 22:15:30,389 - INFO - [AQUISTIL] switches history=True spatial=True event_features=True event_refinement=False calendar=True site=True gap=True uncertainty=True forward_fill=True median_fill=True adaptive_guardrails=True regime_aware=True gap_threshold=2 boundary_features=False future_context=True
+2026-08-20 22:15:30,390 - INFO - [AQUISTIL]   - Selected/raw input features: 12
+2026-08-20 22:15:30,392 - INFO - [AQUISTIL_Lower_Hunter] adaptive QA enabled=True valid_spatial_references=0 active_blend_rows=0/10675 mean_blend=0.000000 max_blend=0.000000
+2026-08-20 22:15:30,431 - INFO - [AQUISTIL]   - Spatial features: 1
+2026-08-20 22:15:30,432 - INFO - [AQUISTIL_Lower_Hunter] adaptive gap guardrail target=PM2.5 regime=random active_rows=0/10675 mean_blend=0.000
+2026-08-20 22:15:30,438 - INFO - [AQUISTIL]   - Calendar features: 12
+2026-08-20 22:15:30,515 - INFO - [AQUISTIL]   - Lag features and availability flags: 14
+2026-08-20 22:15:30,558 - INFO - [AQUISTIL]   - Rolling features: 16
+2026-08-20 22:15:30,616 - INFO - [AQUISTIL]   - Derived history/event/gap features: 18
+2026-08-20 22:15:30,954 - INFO - [AQUISTIL_Lower_Hunter] adaptive QA enabled=True valid_spatial_references=7882 active_blend_rows=1152/9501 mean_blend=0.310417 max_blend=0.400000
+2026-08-20 22:15:31,013 - INFO - [AQUISTIL_Lower_Hunter] adaptive gap guardrail target=PM10 regime=random active_rows=1152/9501 mean_blend=0.310
+2026-08-20 22:15:32,526 - INFO - [AQUISTIL] final model feature matrix: 78 features
+2026-08-20 22:15:32,533 - INFO - [AQUISTIL] switches history=True spatial=True event_features=True event_refinement=False calendar=True site=True gap=True uncertainty=True forward_fill=True median_fill=True adaptive_guardrails=True regime_aware=True gap_threshold=2 boundary_features=False future_context=True
+2026-08-20 22:15:32,574 - INFO - [AQUISTIL]   - Selected/raw input features: 16
+2026-08-20 22:15:32,634 - INFO - [AQUISTIL]   - Spatial features: 3
+2026-08-20 22:15:32,637 - INFO - [AQUISTIL]   - Calendar features: 12
+2026-08-20 22:15:32,714 - INFO - [AQUISTIL]   - Lag features and availability flags: 14
+2026-08-20 22:15:32,722 - INFO - [AQUISTIL]   - Rolling features: 16
+2026-08-20 22:15:32,753 - INFO - [AQUISTIL]   - Derived history/event/gap features: 18
+2026-08-20 22:15:34,934 - INFO - [AQUISTIL] topology router threshold=2h history_rows=2065 gap_rows=1030
+2026-08-20 22:15:36,247 - INFO - [AQUISTIL] topology router threshold=2h history_rows=2103 gap_rows=747
+2026-08-20 22:15:36,848 - INFO - Completed regional task Lower Hunter/PM2.5/AQUISTIL | random 5% seed=13 | RMSE=2.8726 R2=0.6525
+2026-08-20 22:15:37,407 - INFO - [AQUISTIL] topology router threshold=2h history_rows=2056 gap_rows=1814
+2026-08-20 22:15:37,634 - INFO - Completed regional task Lower Hunter/PM10/AQUISTIL | random 5% seed=13 | RMSE=6.2597 R2=0.4213
+2026-08-20 22:15:38,017 - INFO - [AQUISTIL] topology router threshold=2h history_rows=2053 gap_rows=1834
+2026-08-20 22:15:38,555 - INFO - [AQUISTIL] adaptive spatial contributors=182
+2026-08-20 22:15:39,752 - INFO - [AQUISTIL_Upper_Hunter] adaptive QA enabled=True valid_spatial_references=0 active_blend_rows=0/18836 mean_blend=0.000000 max_blend=0.000000
+2026-08-20 22:15:39,753 - INFO - [AQUISTIL_Upper_Hunter] adaptive gap guardrail target=PM2.5 regime=random active_rows=0/18836 mean_blend=0.000
+2026-08-20 22:15:39,755 - INFO - random 5% seed=29 per-site artificial counts: {'BERESFIELD': 2274, 'NEWCASTLE': 2281, 'WALLSEND': 2260}
+2026-08-20 22:15:39,911 - INFO - random 5% seed=29 per-site artificial counts: {'BERESFIELD': 2286, 'NEWCASTLE': 2304, 'WALLSEND': 2286}
+2026-08-20 22:15:39,949 - INFO - Regional task Lower Hunter/PM2.5/AQUISTIL | random 5% seed=29 | masked=6815 eligible_sites=3
+2026-08-20 22:15:40,167 - INFO - Preparing spatial-temporal data...
+2026-08-20 22:15:40,456 - INFO - Regional task Lower Hunter/PM10/AQUISTIL | random 5% seed=29 | masked=6876 eligible_sites=3
+2026-08-20 22:15:40,672 - INFO - Preparing spatial-temporal data...
+2026-08-20 22:15:40,810 - INFO - Shared preprocessing prepared 14 features; model-specific features may be added after this stage.
+2026-08-20 22:15:40,955 - INFO - Shared preprocessing prepared 12 features; model-specific features may be added after this stage.
+2026-08-20 22:15:41,285 - INFO - [AQUISTIL] adaptive spatial contributors=1
+2026-08-20 22:15:41,635 - INFO - Completed regional task Upper Hunter/PM2.5/AQUISTIL | random 5% seed=13 | RMSE=3.2705 R2=0.2887
+2026-08-20 22:15:41,779 - INFO - [AQUISTIL] adaptive spatial contributors=6
+2026-08-20 22:15:42,113 - INFO - [AQUISTIL_Northern_Tablelands] adaptive QA enabled=True valid_spatial_references=0 active_blend_rows=0/3095 mean_blend=0.000000 max_blend=0.000000
+2026-08-20 22:15:42,117 - INFO - [AQUISTIL_Northern_Tablelands] adaptive gap guardrail target=PM10 regime=random active_rows=0/3095 mean_blend=0.000
+2026-08-20 22:15:42,147 - INFO - random 5% seed=29 per-site artificial counts: {'CAMBERWELL': 2241, 'MERRIWA': 2194, 'MUSWELLBROOK': 2314, 'SINGLETON': 2095}
+2026-08-20 22:15:42,350 - INFO - Regional task Upper Hunter/PM2.5/AQUISTIL | random 5% seed=29 | masked=8844 eligible_sites=4
+2026-08-20 22:15:42,434 - INFO - Preparing spatial-temporal data...
+2026-08-20 22:15:42,547 - INFO - Shared preprocessing prepared 14 features; model-specific features may be added after this stage.
+2026-08-20 22:15:42,569 - INFO - Completed regional task Northern Tablelands/PM10/AQUISTIL | random 5% seed=29 | RMSE=3.8901 R2=0.8653
+2026-08-20 22:15:42,579 - INFO - [AQUISTIL_Northern_Tablelands] adaptive QA enabled=True valid_spatial_references=0 active_blend_rows=0/2850 mean_blend=0.000000 max_blend=0.000000
+2026-08-20 22:15:42,579 - INFO - [AQUISTIL_Northern_Tablelands] adaptive gap guardrail target=PM2.5 regime=random active_rows=0/2850 mean_blend=0.000
+2026-08-20 22:15:42,705 - INFO - random 5% seed=42 per-site artificial counts: {'ARMIDALE': 2296}
+2026-08-20 22:15:42,754 - INFO - Regional task Northern Tablelands/PM10/AQUISTIL | random 5% seed=42 | masked=2296 eligible_sites=1
+2026-08-20 22:15:42,793 - INFO - Preparing spatial-temporal data...
+2026-08-20 22:15:42,830 - INFO - [AQUISTIL] adaptive spatial contributors=1
+2026-08-20 22:15:42,856 - INFO - Shared preprocessing prepared 10 features; model-specific features may be added after this stage.
+2026-08-20 22:15:42,976 - INFO - [AQUISTIL] topology router threshold=2h history_rows=14963 gap_rows=64253
+2026-08-20 22:15:42,978 - INFO - Completed regional task Northern Tablelands/PM2.5/AQUISTIL | random 5% seed=29 | RMSE=1.8301 R2=0.9655
+2026-08-20 22:15:43,008 - INFO - [AQUISTIL] adaptive spatial contributors=0
+2026-08-20 22:15:43,012 - INFO - [AQUISTIL_Southern_Tablelands] adaptive QA enabled=True valid_spatial_references=0 active_blend_rows=0/3887 mean_blend=0.000000 max_blend=0.000000
+2026-08-20 22:15:43,015 - INFO - [AQUISTIL_Southern_Tablelands] adaptive gap guardrail target=PM10 regime=random active_rows=0/3887 mean_blend=0.000
+2026-08-20 22:15:43,301 - INFO - [AQUISTIL_Southern_Tablelands] adaptive QA enabled=True valid_spatial_references=0 active_blend_rows=0/3870 mean_blend=0.000000 max_blend=0.000000
+2026-08-20 22:15:43,306 - INFO - [AQUISTIL_Southern_Tablelands] adaptive gap guardrail target=PM2.5 regime=random active_rows=0/3870 mean_blend=0.000
+2026-08-20 22:15:43,398 - INFO - random 5% seed=42 per-site artificial counts: {'ARMIDALE': 2309}
+2026-08-20 22:15:43,498 - INFO - Regional task Northern Tablelands/PM2.5/AQUISTIL | random 5% seed=42 | masked=2309 eligible_sites=1
+2026-08-20 22:15:43,538 - INFO - Preparing spatial-temporal data...
+2026-08-20 22:15:43,593 - INFO - Shared preprocessing prepared 10 features; model-specific features may be added after this stage.
+2026-08-20 22:15:43,616 - INFO - [AQUISTIL] final model feature matrix: 76 features
+2026-08-20 22:15:43,619 - INFO - [AQUISTIL] switches history=True spatial=True event_features=True event_refinement=False calendar=True site=True gap=True uncertainty=True forward_fill=True median_fill=True adaptive_guardrails=True regime_aware=True gap_threshold=2 boundary_features=False future_context=True
+2026-08-20 22:15:43,622 - INFO - [AQUISTIL]   - Selected/raw input features: 14
+2026-08-20 22:15:43,623 - INFO - [AQUISTIL]   - Spatial features: 2
+2026-08-20 22:15:43,626 - INFO - [AQUISTIL]   - Calendar features: 12
+2026-08-20 22:15:43,640 - INFO - [AQUISTIL]   - Lag features and availability flags: 14
+2026-08-20 22:15:43,646 - INFO - [AQUISTIL]   - Rolling features: 16
+2026-08-20 22:15:43,649 - INFO - [AQUISTIL]   - Derived history/event/gap features: 18
+2026-08-20 22:15:43,735 - INFO - Completed regional task Southern Tablelands/PM10/AQUISTIL | random 5% seed=29 | RMSE=3.4165 R2=0.7053
+2026-08-20 22:15:43,792 - INFO - Completed regional task Southern Tablelands/PM2.5/AQUISTIL | random 5% seed=29 | RMSE=1.4559 R2=0.9095
+2026-08-20 22:15:43,793 - INFO - [AQUISTIL] adaptive spatial contributors=0
+2026-08-20 22:15:43,864 - INFO - random 5% seed=42 per-site artificial counts: {'GOULBURN': 2254}
+2026-08-20 22:15:43,945 - INFO - Regional task Southern Tablelands/PM10/AQUISTIL | random 5% seed=42 | masked=2254 eligible_sites=1
+2026-08-20 22:15:44,117 - INFO - Preparing spatial-temporal data...
+2026-08-20 22:15:44,138 - INFO - random 5% seed=42 per-site artificial counts: {'GOULBURN': 2255}
+2026-08-20 22:15:44,197 - INFO - Regional task Southern Tablelands/PM2.5/AQUISTIL | random 5% seed=42 | masked=2255 eligible_sites=1
+2026-08-20 22:15:44,205 - INFO - Shared preprocessing prepared 12 features; model-specific features may be added after this stage.
+2026-08-20 22:15:44,241 - INFO - Preparing spatial-temporal data...
+2026-08-20 22:15:44,303 - INFO - Shared preprocessing prepared 13 features; model-specific features may be added after this stage.
+2026-08-20 22:15:44,369 - INFO - [AQUISTIL] adaptive spatial contributors=1
+2026-08-20 22:15:44,377 - INFO - [AQUISTIL] adaptive spatial contributors=0
+2026-08-20 22:16:13,943 - INFO - [AQUISTIL] final model feature matrix: 72 features
+2026-08-20 22:16:13,945 - INFO - [AQUISTIL] switches history=True spatial=True event_features=True event_refinement=False calendar=True site=True gap=True uncertainty=True forward_fill=True median_fill=True adaptive_guardrails=True regime_aware=True gap_threshold=2 boundary_features=False future_context=True
+2026-08-20 22:16:13,947 - INFO - [AQUISTIL]   - Selected/raw input features: 10
+2026-08-20 22:16:13,950 - INFO - [AQUISTIL]   - Spatial features: 1
+2026-08-20 22:16:13,952 - INFO - [AQUISTIL]   - Calendar features: 12
+2026-08-20 22:16:13,954 - INFO - [AQUISTIL]   - Lag features and availability flags: 14
+2026-08-20 22:16:13,955 - INFO - [AQUISTIL]   - Rolling features: 16
+2026-08-20 22:16:13,958 - INFO - [AQUISTIL]   - Derived history/event/gap features: 18
+2026-08-20 22:16:20,542 - INFO - [AQUISTIL] topology router threshold=2h history_rows=14565 gap_rows=62938
+2026-08-20 22:16:20,574 - INFO - [AQUISTIL] final model feature matrix: 72 features
+2026-08-20 22:16:20,575 - INFO - [AQUISTIL] switches history=True spatial=True event_features=True event_refinement=False calendar=True site=True gap=True uncertainty=True forward_fill=True median_fill=True adaptive_guardrails=True regime_aware=True gap_threshold=2 boundary_features=False future_context=True
+2026-08-20 22:16:20,576 - INFO - [AQUISTIL] final model feature matrix: 76 features
+2026-08-20 22:16:20,577 - INFO - [AQUISTIL]   - Selected/raw input features: 10
+2026-08-20 22:16:20,577 - INFO - [AQUISTIL] switches history=True spatial=True event_features=True event_refinement=False calendar=True site=True gap=True uncertainty=True forward_fill=True median_fill=True adaptive_guardrails=True regime_aware=True gap_threshold=2 boundary_features=False future_context=True
+2026-08-20 22:16:20,577 - INFO - [AQUISTIL]   - Spatial features: 1
+2026-08-20 22:16:20,578 - INFO - [AQUISTIL]   - Selected/raw input features: 14
+2026-08-20 22:16:20,579 - INFO - [AQUISTIL]   - Calendar features: 12
+2026-08-20 22:16:20,580 - INFO - [AQUISTIL]   - Spatial features: 2
+2026-08-20 22:16:20,580 - INFO - [AQUISTIL]   - Lag features and availability flags: 14
+2026-08-20 22:16:20,581 - INFO - [AQUISTIL]   - Calendar features: 12
+2026-08-20 22:16:20,581 - INFO - [AQUISTIL]   - Rolling features: 16
+2026-08-20 22:16:20,582 - INFO - [AQUISTIL]   - Lag features and availability flags: 14
+2026-08-20 22:16:20,583 - INFO - [AQUISTIL]   - Derived history/event/gap features: 18
+2026-08-20 22:16:20,583 - INFO - [AQUISTIL]   - Rolling features: 16
+2026-08-20 22:16:20,584 - INFO - [AQUISTIL]   - Derived history/event/gap features: 18
+2026-08-20 22:16:20,816 - INFO - [AQUISTIL] final model feature matrix: 77 features
+2026-08-20 22:16:20,817 - INFO - [AQUISTIL] switches history=True spatial=True event_features=True event_refinement=False calendar=True site=True gap=True uncertainty=True forward_fill=True median_fill=True adaptive_guardrails=True regime_aware=True gap_threshold=2 boundary_features=False future_context=True
+2026-08-20 22:16:20,817 - INFO - [AQUISTIL]   - Selected/raw input features: 15
+2026-08-20 22:16:20,818 - INFO - [AQUISTIL]   - Spatial features: 3
+2026-08-20 22:16:20,819 - INFO - [AQUISTIL]   - Calendar features: 12
+2026-08-20 22:16:20,820 - INFO - [AQUISTIL]   - Lag features and availability flags: 14
+2026-08-20 22:16:20,821 - INFO - [AQUISTIL]   - Rolling features: 16
+2026-08-20 22:16:20,822 - INFO - [AQUISTIL]   - Derived history/event/gap features: 18
+2026-08-20 22:16:20,847 - INFO - [AQUISTIL] final model feature matrix: 78 features
+2026-08-20 22:16:20,848 - INFO - [AQUISTIL] switches history=True spatial=True event_features=True event_refinement=False calendar=True site=True gap=True uncertainty=True forward_fill=True median_fill=True adaptive_guardrails=True regime_aware=True gap_threshold=2 boundary_features=False future_context=True
+2026-08-20 22:16:20,849 - INFO - [AQUISTIL]   - Selected/raw input features: 16
+2026-08-20 22:16:20,850 - INFO - [AQUISTIL]   - Spatial features: 3
+2026-08-20 22:16:20,850 - INFO - [AQUISTIL] final model feature matrix: 74 features
+2026-08-20 22:16:20,851 - INFO - [AQUISTIL]   - Calendar features: 12
+2026-08-20 22:16:20,851 - INFO - [AQUISTIL] switches history=True spatial=True event_features=True event_refinement=False calendar=True site=True gap=True uncertainty=True forward_fill=True median_fill=True adaptive_guardrails=True regime_aware=True gap_threshold=2 boundary_features=False future_context=True
+2026-08-20 22:16:20,852 - INFO - [AQUISTIL]   - Lag features and availability flags: 14
+2026-08-20 22:16:20,853 - INFO - [AQUISTIL]   - Selected/raw input features: 12
+2026-08-20 22:16:20,854 - INFO - [AQUISTIL]   - Rolling features: 16
+2026-08-20 22:16:20,854 - INFO - [AQUISTIL]   - Spatial features: 1
+2026-08-20 22:16:20,855 - INFO - [AQUISTIL]   - Derived history/event/gap features: 18
+2026-08-20 22:16:20,856 - INFO - [AQUISTIL]   - Calendar features: 12
+2026-08-20 22:16:20,856 - INFO - [AQUISTIL]   - Lag features and availability flags: 14
+2026-08-20 22:16:20,857 - INFO - [AQUISTIL]   - Rolling features: 16
+2026-08-20 22:16:20,858 - INFO - [AQUISTIL]   - Derived history/event/gap features: 18
+2026-08-20 22:16:36,791 - INFO - [AQUISTIL] topology router threshold=2h history_rows=2133 gap_rows=962
+2026-08-20 22:16:37,044 - INFO - [AQUISTIL] topology router threshold=2h history_rows=2118 gap_rows=732
+2026-08-20 22:16:37,133 - INFO - [AQUISTIL] topology router threshold=2h history_rows=2066 gap_rows=1804
+2026-08-20 22:16:37,137 - INFO - [AQUISTIL] topology router threshold=2h history_rows=2080 gap_rows=1807
+2026-08-20 22:16:37,548 - INFO - [AQUISTIL] topology router threshold=2h history_rows=6341 gap_rows=3160
+2026-08-20 22:16:37,550 - INFO - [AQUISTIL] final model feature matrix: 78 features
+2026-08-20 22:16:37,551 - INFO - [AQUISTIL] switches history=True spatial=True event_features=True event_refinement=False calendar=True site=True gap=True uncertainty=True forward_fill=True median_fill=True adaptive_guardrails=True regime_aware=True gap_threshold=2 boundary_features=False future_context=True
+2026-08-20 22:16:37,552 - INFO - [AQUISTIL]   - Selected/raw input features: 16
+2026-08-20 22:16:37,552 - INFO - [AQUISTIL]   - Spatial features: 3
+2026-08-20 22:16:37,553 - INFO - [AQUISTIL]   - Calendar features: 12
+2026-08-20 22:16:37,554 - INFO - [AQUISTIL]   - Lag features and availability flags: 14
+2026-08-20 22:16:37,554 - INFO - [AQUISTIL]   - Rolling features: 16
+2026-08-20 22:16:37,555 - INFO - [AQUISTIL]   - Derived history/event/gap features: 18
+2026-08-20 22:16:37,786 - INFO - [AQUISTIL] topology router threshold=2h history_rows=6860 gap_rows=3815
+2026-08-20 22:16:58,254 - INFO - [AQUISTIL_Northern_Tablelands] adaptive QA enabled=True valid_spatial_references=0 active_blend_rows=0/3095 mean_blend=0.000000 max_blend=0.000000
+2026-08-20 22:16:58,266 - INFO - [AQUISTIL_Northern_Tablelands] adaptive gap guardrail target=PM10 regime=random active_rows=0/3095 mean_blend=0.000
+2026-08-20 22:17:10,394 - INFO - [AQUISTIL_Sydney_East] adaptive QA enabled=True valid_spatial_references=0 active_blend_rows=0/79216 mean_blend=0.000000 max_blend=0.000000
+2026-08-20 22:17:10,424 - INFO - [AQUISTIL_Sydney_East] adaptive gap guardrail target=PM2.5 regime=random active_rows=0/79216 mean_blend=0.000
+2026-08-20 22:17:15,114 - INFO - Completed regional task Northern Tablelands/PM10/AQUISTIL | random 5% seed=42 | RMSE=3.5846 R2=0.8708
+2026-08-20 22:17:15,335 - INFO - [AQUISTIL_Southern_Tablelands] adaptive QA enabled=True valid_spatial_references=0 active_blend_rows=0/3870 mean_blend=0.000000 max_blend=0.000000
+2026-08-20 22:17:15,414 - INFO - [AQUISTIL_Southern_Tablelands] adaptive gap guardrail target=PM2.5 regime=random active_rows=0/3870 mean_blend=0.000
+2026-08-20 22:17:15,968 - INFO - [AQUISTIL] topology router threshold=2h history_rows=9095 gap_rows=9741
+2026-08-20 22:17:16,952 - INFO - [AQUISTIL_Southern_Tablelands] adaptive QA enabled=True valid_spatial_references=0 active_blend_rows=0/3887 mean_blend=0.000000 max_blend=0.000000
+2026-08-20 22:17:16,956 - INFO - [AQUISTIL_Southern_Tablelands] adaptive gap guardrail target=PM10 regime=random active_rows=0/3887 mean_blend=0.000
+2026-08-20 22:17:17,325 - INFO - [AQUISTIL_Northern_Tablelands] adaptive QA enabled=True valid_spatial_references=0 active_blend_rows=0/2850 mean_blend=0.000000 max_blend=0.000000
+2026-08-20 22:17:17,427 - INFO - [AQUISTIL_Northern_Tablelands] adaptive gap guardrail target=PM2.5 regime=random active_rows=0/2850 mean_blend=0.000
+2026-08-20 22:17:18,748 - INFO - random 5% seed=77 per-site artificial counts: {'ARMIDALE': 2296}
+2026-08-20 22:17:19,298 - INFO - Regional task Northern Tablelands/PM10/AQUISTIL | random 5% seed=77 | masked=2296 eligible_sites=1
+2026-08-20 22:17:19,621 - INFO - Preparing spatial-temporal data...
+2026-08-20 22:17:20,260 - INFO - Shared preprocessing prepared 10 features; model-specific features may be added after this stage.
+2026-08-20 22:17:21,625 - INFO - Completed regional task Southern Tablelands/PM2.5/AQUISTIL | random 5% seed=42 | RMSE=1.3955 R2=0.9089
+2026-08-20 22:17:22,380 - INFO - Completed regional task Northern Tablelands/PM2.5/AQUISTIL | random 5% seed=42 | RMSE=1.8032 R2=0.9662
+2026-08-20 22:17:22,694 - INFO - Completed regional task Southern Tablelands/PM10/AQUISTIL | random 5% seed=42 | RMSE=3.2549 R2=0.6815
+2026-08-20 22:17:23,188 - INFO - [AQUISTIL] adaptive spatial contributors=0
+2026-08-20 22:17:23,513 - INFO - random 5% seed=77 per-site artificial counts: {'GOULBURN': 2255}
+2026-08-20 22:17:23,871 - INFO - Regional task Southern Tablelands/PM2.5/AQUISTIL | random 5% seed=77 | masked=2255 eligible_sites=1
+2026-08-20 22:17:24,132 - INFO - random 5% seed=77 per-site artificial counts: {'ARMIDALE': 2309}
+2026-08-20 22:17:24,288 - INFO - Preparing spatial-temporal data...
+2026-08-20 22:17:24,289 - INFO - random 5% seed=77 per-site artificial counts: {'GOULBURN': 2254}
+2026-08-20 22:17:24,542 - INFO - Regional task Northern Tablelands/PM2.5/AQUISTIL | random 5% seed=77 | masked=2309 eligible_sites=1
+2026-08-20 22:17:24,790 - INFO - Regional task Southern Tablelands/PM10/AQUISTIL | random 5% seed=77 | masked=2254 eligible_sites=1
+2026-08-20 22:17:24,933 - INFO - Preparing spatial-temporal data...
+2026-08-20 22:17:25,079 - INFO - Preparing spatial-temporal data...
+2026-08-20 22:17:25,187 - INFO - Shared preprocessing prepared 13 features; model-specific features may be added after this stage.
+2026-08-20 22:17:25,521 - INFO - Shared preprocessing prepared 10 features; model-specific features may be added after this stage.
+2026-08-20 22:17:25,832 - INFO - Shared preprocessing prepared 12 features; model-specific features may be added after this stage.
+2026-08-20 22:17:27,337 - INFO - [AQUISTIL] adaptive spatial contributors=1
+2026-08-20 22:17:27,423 - INFO - [AQUISTIL] adaptive spatial contributors=0
+2026-08-20 22:17:27,439 - INFO - [AQUISTIL] adaptive spatial contributors=0
+2026-08-20 22:17:27,469 - INFO - [AQUISTIL_Lower_Hunter] adaptive QA enabled=True valid_spatial_references=7867 active_blend_rows=1190/9501 mean_blend=0.308361 max_blend=0.400000
+2026-08-20 22:17:27,490 - INFO - [AQUISTIL_Lower_Hunter] adaptive gap guardrail target=PM10 regime=random active_rows=1190/9501 mean_blend=0.308
+2026-08-20 22:17:27,616 - INFO - [AQUISTIL_Sydney_East] adaptive QA enabled=True valid_spatial_references=77496 active_blend_rows=58957/77503 mean_blend=0.483086 max_blend=0.500000
+2026-08-20 22:17:27,628 - INFO - [AQUISTIL_Sydney_East] adaptive gap guardrail target=PM10 regime=random active_rows=58957/77503 mean_blend=0.483
+2026-08-20 22:17:27,795 - INFO - Completed regional task Sydney East/PM2.5/AQUISTIL | random 5% seed=13 | RMSE=3.4019 R2=0.6692
+2026-08-20 22:17:28,468 - INFO - [AQUISTIL_Lower_Hunter] adaptive QA enabled=True valid_spatial_references=0 active_blend_rows=0/10675 mean_blend=0.000000 max_blend=0.000000
+2026-08-20 22:17:28,480 - INFO - [AQUISTIL_Lower_Hunter] adaptive gap guardrail target=PM2.5 regime=random active_rows=0/10675 mean_blend=0.000
+2026-08-20 22:17:28,968 - INFO - Completed regional task Lower Hunter/PM10/AQUISTIL | random 5% seed=29 | RMSE=6.3308 R2=0.4463
+2026-08-20 22:17:29,231 - INFO - Completed regional task Lower Hunter/PM2.5/AQUISTIL | random 5% seed=29 | RMSE=2.9614 R2=0.6016
+2026-08-20 22:17:29,284 - INFO - random 5% seed=29 per-site artificial counts: {'ALEXANDRIA': 1646, 'COOK AND PHILLIP': 2184, 'EARLWOOD': 2291, 'LIDCOMBE': 2232, 'MACQUARIE PARK': 2284, 'RANDWICK': 2275, 'ROZELLE': 2277, 'ULTIMO-UTS': 314}
+2026-08-20 22:17:29,570 - INFO - random 5% seed=42 per-site artificial counts: {'BERESFIELD': 2286, 'NEWCASTLE': 2304, 'WALLSEND': 2286}
+2026-08-20 22:17:29,705 - INFO - Regional task Lower Hunter/PM10/AQUISTIL | random 5% seed=42 | masked=6876 eligible_sites=3
+2026-08-20 22:17:29,727 - INFO - Regional task Sydney East/PM2.5/AQUISTIL | random 5% seed=29 | masked=15503 eligible_sites=8
+2026-08-20 22:17:29,753 - INFO - Preparing spatial-temporal data...
+2026-08-20 22:17:33,073 - INFO - Preparing spatial-temporal data...
+2026-08-20 22:17:33,141 - INFO - Shared preprocessing prepared 12 features; model-specific features may be added after this stage.
+2026-08-20 22:17:33,177 - INFO - Completed regional task Sydney East/PM10/AQUISTIL | random 5% seed=13 | RMSE=4.7808 R2=0.5777
+2026-08-20 22:17:33,178 - INFO - random 5% seed=42 per-site artificial counts: {'BERESFIELD': 2274, 'NEWCASTLE': 2281, 'WALLSEND': 2260}
+2026-08-20 22:17:33,181 - INFO - Shared preprocessing prepared 14 features; model-specific features may be added after this stage.
+2026-08-20 22:17:33,322 - INFO - Regional task Lower Hunter/PM2.5/AQUISTIL | random 5% seed=42 | masked=6815 eligible_sites=3
+2026-08-20 22:17:33,510 - INFO - Preparing spatial-temporal data...
+2026-08-20 22:17:33,564 - INFO - [AQUISTIL] adaptive spatial contributors=1
+2026-08-20 22:17:37,057 - INFO - Shared preprocessing prepared 14 features; model-specific features may be added after this stage.
+2026-08-20 22:17:40,569 - INFO - [AQUISTIL] adaptive spatial contributors=1
+2026-08-20 22:17:44,539 - INFO - [AQUISTIL] adaptive spatial contributors=6
+2026-08-20 22:17:44,553 - INFO - [AQUISTIL] final model feature matrix: 72 features
+2026-08-20 22:17:44,558 - INFO - [AQUISTIL] switches history=True spatial=True event_features=True event_refinement=False calendar=True site=True gap=True uncertainty=True forward_fill=True median_fill=True adaptive_guardrails=True regime_aware=True gap_threshold=2 boundary_features=False future_context=True
+2026-08-20 22:17:44,559 - INFO - [AQUISTIL]   - Selected/raw input features: 10
+2026-08-20 22:17:44,561 - INFO - [AQUISTIL]   - Spatial features: 1
+2026-08-20 22:17:44,563 - INFO - [AQUISTIL]   - Calendar features: 12
+2026-08-20 22:17:44,570 - INFO - [AQUISTIL]   - Lag features and availability flags: 14
+2026-08-20 22:17:44,587 - INFO - [AQUISTIL]   - Rolling features: 16
+2026-08-20 22:17:44,595 - INFO - [AQUISTIL]   - Derived history/event/gap features: 18
+2026-08-20 22:17:44,740 - INFO - [AQUISTIL] final model feature matrix: 76 features
+2026-08-20 22:17:44,742 - INFO - [AQUISTIL] switches history=True spatial=True event_features=True event_refinement=False calendar=True site=True gap=True uncertainty=True forward_fill=True median_fill=True adaptive_guardrails=True regime_aware=True gap_threshold=2 boundary_features=False future_context=True
+2026-08-20 22:17:44,751 - INFO - [AQUISTIL]   - Selected/raw input features: 14
+2026-08-20 22:17:44,755 - INFO - [AQUISTIL]   - Spatial features: 2
+2026-08-20 22:17:44,770 - INFO - [AQUISTIL]   - Calendar features: 12
+2026-08-20 22:17:44,773 - INFO - [AQUISTIL]   - Lag features and availability flags: 14
+2026-08-20 22:17:44,786 - INFO - [AQUISTIL]   - Rolling features: 16
+2026-08-20 22:17:44,802 - INFO - [AQUISTIL]   - Derived history/event/gap features: 18
+2026-08-20 22:17:44,898 - INFO - random 5% seed=29 per-site artificial counts: {'ALEXANDRIA': 1647, 'COOK AND PHILLIP': 2186, 'EARLWOOD': 2294, 'LIDCOMBE': 2304, 'MACQUARIE PARK': 2258, 'RANDWICK': 2296, 'ROZELLE': 2284, 'ULTIMO-UTS': 323}
+2026-08-20 22:17:45,141 - INFO - [AQUISTIL] final model feature matrix: 72 features
+2026-08-20 22:17:45,143 - INFO - [AQUISTIL] switches history=True spatial=True event_features=True event_refinement=False calendar=True site=True gap=True uncertainty=True forward_fill=True median_fill=True adaptive_guardrails=True regime_aware=True gap_threshold=2 boundary_features=False future_context=True
+2026-08-20 22:17:45,144 - INFO - [AQUISTIL]   - Selected/raw input features: 10
+2026-08-20 22:17:45,147 - INFO - [AQUISTIL]   - Spatial features: 1
+2026-08-20 22:17:45,147 - INFO - [AQUISTIL]   - Calendar features: 12
+2026-08-20 22:17:45,148 - INFO - [AQUISTIL]   - Lag features and availability flags: 14
+2026-08-20 22:17:45,149 - INFO - [AQUISTIL]   - Rolling features: 16
+2026-08-20 22:17:45,150 - INFO - [AQUISTIL]   - Derived history/event/gap features: 18
+2026-08-20 22:17:45,183 - INFO - Regional task Sydney East/PM10/AQUISTIL | random 5% seed=29 | masked=15592 eligible_sites=8
+2026-08-20 22:17:45,227 - INFO - [AQUISTIL] final model feature matrix: 77 features
+2026-08-20 22:17:45,228 - INFO - [AQUISTIL] switches history=True spatial=True event_features=True event_refinement=False calendar=True site=True gap=True uncertainty=True forward_fill=True median_fill=True adaptive_guardrails=True regime_aware=True gap_threshold=2 boundary_features=False future_context=True
+2026-08-20 22:17:45,230 - INFO - [AQUISTIL]   - Selected/raw input features: 15
+2026-08-20 22:17:45,231 - INFO - [AQUISTIL]   - Spatial features: 3
+2026-08-20 22:17:45,231 - INFO - [AQUISTIL]   - Calendar features: 12
+2026-08-20 22:17:45,232 - INFO - [AQUISTIL]   - Lag features and availability flags: 14
+2026-08-20 22:17:45,233 - INFO - [AQUISTIL]   - Rolling features: 16
+2026-08-20 22:17:45,235 - INFO - [AQUISTIL]   - Derived history/event/gap features: 18
+2026-08-20 22:17:45,299 - INFO - Preparing spatial-temporal data...
+2026-08-20 22:17:45,314 - INFO - [AQUISTIL] final model feature matrix: 74 features
+2026-08-20 22:17:45,317 - INFO - [AQUISTIL] switches history=True spatial=True event_features=True event_refinement=False calendar=True site=True gap=True uncertainty=True forward_fill=True median_fill=True adaptive_guardrails=True regime_aware=True gap_threshold=2 boundary_features=False future_context=True
+2026-08-20 22:17:45,327 - INFO - [AQUISTIL]   - Selected/raw input features: 12
+2026-08-20 22:17:45,331 - INFO - [AQUISTIL]   - Spatial features: 1
+2026-08-20 22:17:45,332 - INFO - [AQUISTIL]   - Calendar features: 12
+2026-08-20 22:17:45,333 - INFO - [AQUISTIL]   - Lag features and availability flags: 14
+2026-08-20 22:17:45,334 - INFO - [AQUISTIL]   - Rolling features: 16
+2026-08-20 22:17:45,335 - INFO - [AQUISTIL]   - Derived history/event/gap features: 18
+2026-08-20 22:17:45,372 - INFO - Shared preprocessing prepared 12 features; model-specific features may be added after this stage.
+2026-08-20 22:17:45,542 - INFO - [AQUISTIL_Upper_Hunter] adaptive QA enabled=True valid_spatial_references=0 active_blend_rows=0/18836 mean_blend=0.000000 max_blend=0.000000
+2026-08-20 22:17:45,546 - INFO - [AQUISTIL_Upper_Hunter] adaptive gap guardrail target=PM2.5 regime=random active_rows=0/18836 mean_blend=0.000
+2026-08-20 22:17:45,584 - INFO - [AQUISTIL] topology router threshold=2h history_rows=2090 gap_rows=1005
+2026-08-20 22:17:46,032 - INFO - [AQUISTIL] topology router threshold=2h history_rows=2109 gap_rows=741
+2026-08-20 22:17:46,108 - INFO - Completed regional task Upper Hunter/PM2.5/AQUISTIL | random 5% seed=29 | RMSE=3.5443 R2=0.3463
+2026-08-20 22:17:46,207 - INFO - [AQUISTIL] topology router threshold=2h history_rows=2021 gap_rows=1866
+2026-08-20 22:17:46,262 - INFO - [AQUISTIL] topology router threshold=2h history_rows=2026 gap_rows=1844
+2026-08-20 22:17:46,330 - INFO - random 5% seed=42 per-site artificial counts: {'CAMBERWELL': 2241, 'MERRIWA': 2194, 'MUSWELLBROOK': 2314, 'SINGLETON': 2095}
+2026-08-20 22:17:46,567 - INFO - Regional task Upper Hunter/PM2.5/AQUISTIL | random 5% seed=42 | masked=8844 eligible_sites=4
+2026-08-20 22:17:46,604 - INFO - Preparing spatial-temporal data...
+2026-08-20 22:17:46,668 - INFO - Shared preprocessing prepared 14 features; model-specific features may be added after this stage.
+2026-08-20 22:17:46,779 - INFO - [AQUISTIL] adaptive spatial contributors=1
+2026-08-20 22:17:50,556 - INFO - [AQUISTIL] adaptive spatial contributors=56
+2026-08-20 22:18:04,232 - INFO - [AQUISTIL_Northern_Tablelands] adaptive QA enabled=True valid_spatial_references=0 active_blend_rows=0/3095 mean_blend=0.000000 max_blend=0.000000
+2026-08-20 22:18:04,245 - INFO - [AQUISTIL_Northern_Tablelands] adaptive gap guardrail target=PM10 regime=random active_rows=0/3095 mean_blend=0.000
+2026-08-20 22:18:07,941 - INFO - [AQUISTIL_Northern_Tablelands] adaptive QA enabled=True valid_spatial_references=0 active_blend_rows=0/2850 mean_blend=0.000000 max_blend=0.000000
+2026-08-20 22:18:07,972 - INFO - [AQUISTIL_Northern_Tablelands] adaptive gap guardrail target=PM2.5 regime=random active_rows=0/2850 mean_blend=0.000
+2026-08-20 22:18:08,180 - INFO - Completed regional task Northern Tablelands/PM10/AQUISTIL | random 5% seed=77 | RMSE=3.7520 R2=0.8764
+2026-08-20 22:18:08,815 - INFO - [AQUISTIL_Southern_Tablelands] adaptive QA enabled=True valid_spatial_references=0 active_blend_rows=0/3887 mean_blend=0.000000 max_blend=0.000000
+2026-08-20 22:18:08,821 - INFO - [AQUISTIL_Southern_Tablelands] adaptive gap guardrail target=PM10 regime=random active_rows=0/3887 mean_blend=0.000
+2026-08-20 22:18:10,265 - INFO - [AQUISTIL] topology router threshold=2h history_rows=29797 gap_rows=15693
+2026-08-20 22:18:10,267 - INFO - random 5% seed=101 per-site artificial counts: {'ARMIDALE': 2296}
+2026-08-20 22:18:10,328 - INFO - Regional task Northern Tablelands/PM10/AQUISTIL | random 5% seed=101 | masked=2296 eligible_sites=1
+2026-08-20 22:18:10,371 - INFO - Preparing spatial-temporal data...
+2026-08-20 22:18:10,402 - INFO - [AQUISTIL] final model feature matrix: 78 features
+2026-08-20 22:18:10,404 - INFO - [AQUISTIL] switches history=True spatial=True event_features=True event_refinement=False calendar=True site=True gap=True uncertainty=True forward_fill=True median_fill=True adaptive_guardrails=True regime_aware=True gap_threshold=2 boundary_features=False future_context=True
+2026-08-20 22:18:10,406 - INFO - [AQUISTIL]   - Selected/raw input features: 16
+2026-08-20 22:18:10,409 - INFO - [AQUISTIL]   - Spatial features: 3
+2026-08-20 22:18:10,412 - INFO - [AQUISTIL]   - Calendar features: 12
+2026-08-20 22:18:10,415 - INFO - [AQUISTIL]   - Lag features and availability flags: 14
+2026-08-20 22:18:10,420 - INFO - [AQUISTIL]   - Rolling features: 16
+2026-08-20 22:18:10,423 - INFO - [AQUISTIL]   - Derived history/event/gap features: 18
+2026-08-20 22:18:10,429 - INFO - Shared preprocessing prepared 10 features; model-specific features may be added after this stage.
+2026-08-20 22:18:10,502 - INFO - Completed regional task Northern Tablelands/PM2.5/AQUISTIL | random 5% seed=77 | RMSE=2.0476 R2=0.9564
+2026-08-20 22:18:10,551 - INFO - Completed regional task Southern Tablelands/PM10/AQUISTIL | random 5% seed=77 | RMSE=2.9672 R2=0.7265
+2026-08-20 22:18:10,552 - INFO - [AQUISTIL_Southern_Tablelands] adaptive QA enabled=True valid_spatial_references=0 active_blend_rows=0/3870 mean_blend=0.000000 max_blend=0.000000
+2026-08-20 22:18:10,556 - INFO - [AQUISTIL_Southern_Tablelands] adaptive gap guardrail target=PM2.5 regime=random active_rows=0/3870 mean_blend=0.000
+2026-08-20 22:18:10,579 - INFO - [AQUISTIL] adaptive spatial contributors=0
+2026-08-20 22:18:10,691 - INFO - random 5% seed=101 per-site artificial counts: {'ARMIDALE': 2309}
+2026-08-20 22:18:10,767 - INFO - Regional task Northern Tablelands/PM2.5/AQUISTIL | random 5% seed=101 | masked=2309 eligible_sites=1
+2026-08-20 22:18:10,956 - INFO - Preparing spatial-temporal data...
+2026-08-20 22:18:10,977 - INFO - random 5% seed=101 per-site artificial counts: {'GOULBURN': 2254}
+2026-08-20 22:18:11,109 - INFO - Shared preprocessing prepared 10 features; model-specific features may be added after this stage.
+2026-08-20 22:18:11,124 - INFO - Regional task Southern Tablelands/PM10/AQUISTIL | random 5% seed=101 | masked=2254 eligible_sites=1
+2026-08-20 22:18:11,162 - INFO - Preparing spatial-temporal data...
+2026-08-20 22:18:11,358 - INFO - Shared preprocessing prepared 12 features; model-specific features may be added after this stage.
+2026-08-20 22:18:14,100 - INFO - Completed regional task Southern Tablelands/PM2.5/AQUISTIL | random 5% seed=77 | RMSE=1.4641 R2=0.9116
+2026-08-20 22:18:14,122 - INFO - [AQUISTIL] adaptive spatial contributors=0
+2026-08-20 22:18:20,601 - INFO - [AQUISTIL] adaptive spatial contributors=0
+2026-08-20 22:18:20,866 - INFO - random 5% seed=101 per-site artificial counts: {'GOULBURN': 2255}
+2026-08-20 22:18:21,450 - INFO - Regional task Southern Tablelands/PM2.5/AQUISTIL | random 5% seed=101 | masked=2255 eligible_sites=1
+2026-08-20 22:18:21,837 - INFO - Preparing spatial-temporal data...
+2026-08-20 22:18:23,024 - INFO - Shared preprocessing prepared 13 features; model-specific features may be added after this stage.
+2026-08-20 22:18:26,002 - INFO - [AQUISTIL] adaptive spatial contributors=1
+2026-08-20 22:18:28,210 - INFO - [AQUISTIL] final model feature matrix: 76 features
+2026-08-20 22:18:28,298 - INFO - [AQUISTIL] switches history=True spatial=True event_features=True event_refinement=False calendar=True site=True gap=True uncertainty=True forward_fill=True median_fill=True adaptive_guardrails=True regime_aware=True gap_threshold=2 boundary_features=False future_context=True
+2026-08-20 22:18:28,301 - INFO - [AQUISTIL]   - Selected/raw input features: 14
+2026-08-20 22:18:28,418 - INFO - [AQUISTIL]   - Spatial features: 2
+2026-08-20 22:18:28,542 - INFO - [AQUISTIL]   - Calendar features: 12
+2026-08-20 22:18:28,567 - INFO - [AQUISTIL]   - Lag features and availability flags: 14
+2026-08-20 22:18:28,607 - INFO - [AQUISTIL]   - Rolling features: 16
+2026-08-20 22:18:28,667 - INFO - [AQUISTIL]   - Derived history/event/gap features: 18
+2026-08-20 22:18:32,500 - INFO - [AQUISTIL] topology router threshold=2h history_rows=6808 gap_rows=3867
+2026-08-20 22:18:44,009 - INFO - [AQUISTIL] topology router threshold=2h history_rows=6353 gap_rows=3148
+2026-08-20 22:18:58,143 - INFO - [AQUISTIL] final model feature matrix: 72 features
+2026-08-20 22:18:58,199 - INFO - [AQUISTIL] switches history=True spatial=True event_features=True event_refinement=False calendar=True site=True gap=True uncertainty=True forward_fill=True median_fill=True adaptive_guardrails=True regime_aware=True gap_threshold=2 boundary_features=False future_context=True
+2026-08-20 22:18:58,201 - INFO - [AQUISTIL]   - Selected/raw input features: 10
+2026-08-20 22:18:58,203 - INFO - [AQUISTIL]   - Spatial features: 1
+2026-08-20 22:18:58,240 - INFO - [AQUISTIL]   - Calendar features: 12
+2026-08-20 22:18:58,244 - INFO - [AQUISTIL]   - Lag features and availability flags: 14
+2026-08-20 22:18:58,281 - INFO - [AQUISTIL]   - Rolling features: 16
+2026-08-20 22:18:58,314 - INFO - [AQUISTIL]   - Derived history/event/gap features: 18
+2026-08-20 22:19:07,565 - INFO - [AQUISTIL] final model feature matrix: 72 features
+2026-08-20 22:19:07,566 - INFO - [AQUISTIL] switches history=True spatial=True event_features=True event_refinement=False calendar=True site=True gap=True uncertainty=True forward_fill=True median_fill=True adaptive_guardrails=True regime_aware=True gap_threshold=2 boundary_features=False future_context=True
+2026-08-20 22:19:07,567 - INFO - [AQUISTIL]   - Selected/raw input features: 10
+2026-08-20 22:19:07,568 - INFO - [AQUISTIL]   - Spatial features: 1
+2026-08-20 22:19:07,570 - INFO - [AQUISTIL]   - Calendar features: 12
+2026-08-20 22:19:07,570 - INFO - [AQUISTIL]   - Lag features and availability flags: 14
+2026-08-20 22:19:07,571 - INFO - [AQUISTIL]   - Rolling features: 16
+2026-08-20 22:19:07,571 - INFO - [AQUISTIL]   - Derived history/event/gap features: 18
+2026-08-20 22:19:07,598 - INFO - [AQUISTIL_Upper_Hunter] adaptive QA enabled=True valid_spatial_references=45463 active_blend_rows=8183/45490 mean_blend=0.354222 max_blend=0.500000
+2026-08-20 22:19:07,623 - INFO - [AQUISTIL_Upper_Hunter] adaptive gap guardrail target=PM10 regime=random active_rows=8183/45490 mean_blend=0.354
+2026-08-20 22:19:07,635 - INFO - [AQUISTIL] final model feature matrix: 74 features
+2026-08-20 22:19:07,636 - INFO - [AQUISTIL] switches history=True spatial=True event_features=True event_refinement=False calendar=True site=True gap=True uncertainty=True forward_fill=True median_fill=True adaptive_guardrails=True regime_aware=True gap_threshold=2 boundary_features=False future_context=True
+2026-08-20 22:19:07,637 - INFO - [AQUISTIL]   - Selected/raw input features: 12
+2026-08-20 22:19:07,642 - INFO - [AQUISTIL]   - Spatial features: 1
+2026-08-20 22:19:07,643 - INFO - [AQUISTIL]   - Calendar features: 12
+2026-08-20 22:19:07,644 - INFO - [AQUISTIL]   - Lag features and availability flags: 14
+2026-08-20 22:19:07,644 - INFO - [AQUISTIL]   - Rolling features: 16
+2026-08-20 22:19:07,646 - INFO - [AQUISTIL]   - Derived history/event/gap features: 18
+2026-08-20 22:19:08,027 - INFO - [AQUISTIL] final model feature matrix: 78 features
+2026-08-20 22:19:08,028 - INFO - [AQUISTIL] switches history=True spatial=True event_features=True event_refinement=False calendar=True site=True gap=True uncertainty=True forward_fill=True median_fill=True adaptive_guardrails=True regime_aware=True gap_threshold=2 boundary_features=False future_context=True
+2026-08-20 22:19:08,031 - INFO - [AQUISTIL]   - Selected/raw input features: 16
+2026-08-20 22:19:08,033 - INFO - [AQUISTIL]   - Spatial features: 3
+2026-08-20 22:19:08,035 - INFO - [AQUISTIL]   - Calendar features: 12
+2026-08-20 22:19:08,039 - INFO - [AQUISTIL]   - Lag features and availability flags: 14
+2026-08-20 22:19:08,041 - INFO - [AQUISTIL]   - Rolling features: 16
+2026-08-20 22:19:08,043 - INFO - [AQUISTIL]   - Derived history/event/gap features: 18
+2026-08-20 22:19:10,106 - INFO - [AQUISTIL] topology router threshold=2h history_rows=2062 gap_rows=1033
+2026-08-20 22:19:11,674 - INFO - [AQUISTIL] final model feature matrix: 77 features
+2026-08-20 22:19:11,709 - INFO - [AQUISTIL] switches history=True spatial=True event_features=True event_refinement=False calendar=True site=True gap=True uncertainty=True forward_fill=True median_fill=True adaptive_guardrails=True regime_aware=True gap_threshold=2 boundary_features=False future_context=True
+2026-08-20 22:19:11,715 - INFO - [AQUISTIL]   - Selected/raw input features: 15
+2026-08-20 22:19:11,827 - INFO - [AQUISTIL]   - Spatial features: 3
+2026-08-20 22:19:11,829 - INFO - [AQUISTIL]   - Calendar features: 12
+2026-08-20 22:19:11,830 - INFO - [AQUISTIL]   - Lag features and availability flags: 14
+2026-08-20 22:19:11,833 - INFO - [AQUISTIL]   - Rolling features: 16
+2026-08-20 22:19:11,834 - INFO - [AQUISTIL]   - Derived history/event/gap features: 18
+slurmstepd: error: *** JOB 622793 ON sdccomp13 CANCELLED AT 2026-08-20T22:19:13 ***

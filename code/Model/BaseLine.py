@@ -75,6 +75,25 @@ def impute_mice(data, target_column, input_columns, custom_strategies=None, **kw
         pd.DataFrame: Copy of input data with target_column imputed (filled).
     """
     try:
+        # Regional pooled inputs repeat every timestamp once per monitoring
+        # site. Run this temporal baseline per site and preserve the caller's
+        # row index/order instead of treating those rows as duplicate samples.
+        if "Site" in data.columns and data["Site"].nunique(dropna=False) > 1:
+            result = data.copy()
+            target_position = result.columns.get_loc(target_column)
+            for _, positions in data.groupby("Site", sort=False, dropna=False).indices.items():
+                positions = np.asarray(positions)
+                site_result = impute_mice(
+                    data.iloc[positions].copy(), target_column, input_columns,
+                    custom_strategies=custom_strategies, **kwargs
+                )
+                if len(site_result) != len(positions):
+                    raise ValueError("per-site baseline changed the input row count")
+                result.iloc[positions, target_position] = pd.to_numeric(
+                    site_result[target_column], errors="coerce"
+                ).to_numpy()
+            return result
+
         df = data.copy()
         # Normalize DateTime -> DatetimeIndex
         try:
@@ -87,10 +106,21 @@ def impute_mice(data, target_column, input_columns, custom_strategies=None, **kw
             logging.warning(f"[{MODEL_NAME}] impute_mice: target column '{target_column}' not present — returning original.")
             return data.copy()
 
+        # Regional inputs contain one row per site and timestamp, so duplicate
+        # timestamps are expected. Aggregate duplicate timestamps within each
+        # site before creating the hourly axis; otherwise pandas cannot reindex.
+        if not df.index.is_unique:
+            aggregations = {
+                column: ("mean" if pd.api.types.is_numeric_dtype(df[column]) else "first")
+                for column in df.columns
+            }
+            df = df.groupby(level=0, sort=True).agg(aggregations)
+
         # Align to full hourly index (prevent misalignment with pipeline expectations)
         start = df.index.min()
         end = df.index.max()
-        full_index = pd.date_range(start=start, end=end, freq="H")
+        # Pandas 3.0 removed the deprecated uppercase hourly alias ("H").
+        full_index = pd.date_range(start=start, end=end, freq="h")
         df = df.reindex(full_index)
 
         y = pd.to_numeric(df[target_column], errors="coerce")
@@ -208,7 +238,7 @@ def process_site_file(file_path: str, site_name: str, output_directory: str) -> 
             return None
         site_df["datetime"] = pd.to_datetime(site_df["datetime"], errors="coerce")
         site_df = site_df.dropna(subset=["datetime"]).set_index("datetime").sort_index()
-        full_index = pd.date_range(start=site_df.index.min(), end=site_df.index.max(), freq="H")
+        full_index = pd.date_range(start=site_df.index.min(), end=site_df.index.max(), freq="h")
         site_df = site_df.reindex(full_index)
         site_df = site_df.interpolate(method="time", limit_direction="both").reset_index().rename(columns={"index":"datetime"})
         # trivial baseline: copy numeric columns -> Baseline_<var>_<site>

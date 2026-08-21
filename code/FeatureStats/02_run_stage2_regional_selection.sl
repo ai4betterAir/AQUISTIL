@@ -38,4 +38,5 @@ python3 02regional_rf_shap_feature_selection.py \
     --input-dir "${INPUT_DIR}" \
     --output-dir "${OUTPUT_DIR}" \
     --target "${TARGET}" \
-    --regions ""
+    --regions "" \
+    --min-sites 1

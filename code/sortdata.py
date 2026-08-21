@@ -29,7 +29,13 @@ from impute_plot import (
     save_cdf_plot,
     save_histogram,
 )
-from missingness_regimes import apply_missingness
+from missingness_regimes import (
+    apply_missingness,
+    assert_effective_gap_purity,
+    effective_gap_mask_diagnostics,
+    gap_mask_diagnostics,
+    mask_gap_lengths,
+)
 import json
 from typing import Optional
 
@@ -412,6 +418,7 @@ def sort_and_impute_by_hour(
     custom_strategies=None,
     sort_by_hour: bool = False,
     missingness_regime: str = "random",
+    evaluation_seed: int = 42,
     # NEW: central roots passed from main.py (optional)
     central_imputed_root: Optional[str] = None,
     central_metrics_root: Optional[str] = None,
@@ -497,9 +504,7 @@ def sort_and_impute_by_hour(
     all_feature_info = []
     manifest_entries = []
 
-    # local central plots root fallback
-    if not central_plots_root:
-        central_plots_root = os.path.join(metrics_save_path, "..", "plots_by_type")
+    plots_enabled = bool(central_plots_root)
 
     for missingness in missingness_levels:
         logging.info("\n" + "=" * 60)
@@ -518,9 +523,17 @@ def sort_and_impute_by_hour(
             f"Applying {regime} missingness at {int(missingness * 100)}% level..."
         )
         data_copy, simulated_mask = apply_missingness(
-            data_copy, target_column, regime=regime, frac=missingness, seed=42
+            data_copy, target_column, regime=regime, frac=missingness, seed=evaluation_seed
         )
         simulated_mask = simulated_mask & (~original_missing_mask)
+        mask_diagnostics = effective_gap_mask_diagnostics(
+            simulated_mask,
+            original_missing_mask,
+            regime,
+            requested_fraction=missingness,
+            observed_count=int((~original_missing_mask).sum()),
+        )
+        assert_effective_gap_purity(simulated_mask, original_missing_mask, regime)
 
         logging.info(
             f"✅ Missingness applied: regime={regime} | "
@@ -531,31 +544,8 @@ def sort_and_impute_by_hour(
         if regime == "event":
             if simulated_mask.sum() == 0:
                 logging.warning(
-                    "Event regime produced no masked values; falling back to random masking"
+                    "Event regime produced no daily-maximum candidates; keeping a zero-row pure event mask"
                 )
-                data_copy, simulated_mask = apply_missingness(
-                    data_copy,
-                    target_column,
-                    regime="random",
-                    frac=missingness,
-                    seed=42,
-                )
-                simulated_mask = simulated_mask & (~original_missing_mask)
-                if simulated_mask.sum() == 0:
-                    logging.error(
-                        "EVENT REGIME & fallback both failed: No values masked!"
-                    )
-                    logging.error(
-                        f"   Target stats: min={data[target_column].min():.2f}, "
-                        f"max={data[target_column].max():.2f}, "
-                        f"90th percentile={data[target_column].quantile(0.9):.2f}"
-                    )
-                else:
-                    masked_values = data.loc[simulated_mask, target_column]
-                    logging.info(
-                        "   Fallback masking successful: masked values range "
-                        f"[{masked_values.min():.2f}, {masked_values.max():.2f}]"
-                    )
             else:
                 masked_values = data.loc[simulated_mask, target_column]
                 logging.info(
@@ -863,6 +853,28 @@ def sort_and_impute_by_hour(
         target_column_data["Missing_Type"] = "None"
         target_column_data.loc[original_missing_mask, "Missing_Type"] = "Original"
         target_column_data.loc[simulated_mask, "Missing_Type"] = "Simulated"
+        target_column_data["Artificial_Gap_Length"] = mask_gap_lengths(simulated_mask)
+        target_column_data["Effective_Gap_Length"] = mask_gap_lengths(
+            original_missing_mask | simulated_mask
+        )
+        target_column_data["Artificial_Gap_In_Regime"] = np.nan
+        target_column_data["Effective_Gap_In_Regime"] = np.nan
+        regime_bounds = {
+            "short_gap": (1, 23),
+            "medium_gap": (24, 71),
+            "long_gap": (72, 240),
+        }.get(regime)
+        if regime_bounds:
+            artificial_lengths = target_column_data["Artificial_Gap_Length"]
+            effective_lengths = target_column_data["Effective_Gap_Length"]
+            target_column_data.loc[simulated_mask, "Artificial_Gap_In_Regime"] = (
+                (artificial_lengths.loc[simulated_mask] >= regime_bounds[0])
+                & (artificial_lengths.loc[simulated_mask] <= regime_bounds[1])
+            ).astype(float)
+            target_column_data.loc[simulated_mask, "Effective_Gap_In_Regime"] = (
+                (effective_lengths.loc[simulated_mask] >= regime_bounds[0])
+                & (effective_lengths.loc[simulated_mask] <= regime_bounds[1])
+            ).astype(float)
 
         target_column_csv_filename = os.path.join(
             target_column_data_path,
@@ -907,6 +919,7 @@ def sort_and_impute_by_hour(
                     handle_negative=handle_negatives,
                 )
                 metrics["Missingness"] = missingness
+                metrics.update(mask_diagnostics)
                 metrics.setdefault("Missingness_Regime", regime)
                 metrics.setdefault("Total_Features_Used", len(actual_columns_used))
                 metrics.setdefault("Base_Features", len(base_features))
@@ -987,83 +1000,84 @@ def sort_and_impute_by_hour(
                 except Exception as e:
                     logging.error("Error computing gapwise metrics: %s", e)
 
-                try:
-                    os.makedirs(central_plots_root, exist_ok=True)
-                    model_name_with_regime = f"{canonical_model}_{regime}"
-                    save_scatterplot(
-                        true_values_clean,
-                        imputed_values_clean,
-                        central_plots_root,
-                        site_name,
-                        target_column,
-                        model_name_with_regime,
-                        missingness,
-                        rmse=metrics.get("Root Mean Squared Error (RMSE)"),
-                        r=metrics.get("Correlation Coefficient (R)"),
-                    )
-                    save_error_distribution(
-                        true_values_clean,
-                        imputed_values_clean,
-                        central_plots_root,
-                        site_name,
-                        target_column,
-                        model_name_with_regime,
-                        missingness,
-                    )
-                    save_residual_plot(
-                        true_values_clean,
-                        imputed_values_clean,
-                        central_plots_root,
-                        site_name,
-                        target_column,
-                        model_name_with_regime,
-                        missingness,
-                    )
-                    save_qq_plot(
-                        imputed_values_clean,
-                        central_plots_root,
-                        site_name,
-                        target_column,
-                        model_name_with_regime,
-                        missingness,
-                    )
-                    save_correlation_heatmap(
-                        imputed_data,
-                        central_plots_root,
-                        site_name,
-                        target_column,
-                        model_name_with_regime,
-                        missingness,
-                    )
-                    save_statistical_summary(
-                        data_copy,
-                        imputed_data,
-                        central_plots_root,
-                        site_name,
-                        target_column,
-                        model_name_with_regime,
-                        missingness,
-                    )
-                    save_cdf_plot(
-                        true_values_clean,
-                        imputed_values_clean,
-                        central_plots_root,
-                        site_name,
-                        target_column,
-                        model_name_with_regime,
-                        missingness,
-                    )
-                    save_histogram(
-                        data_copy,
-                        imputed_values_clean,
-                        central_plots_root,
-                        site_name,
-                        target_column,
-                        model_name_with_regime,
-                        missingness,
-                    )
-                except Exception as e:
-                    logging.error("Error generating plots: %s", e)
+                if plots_enabled:
+                    try:
+                        os.makedirs(central_plots_root, exist_ok=True)
+                        model_name_with_regime = f"{canonical_model}_{regime}"
+                        save_scatterplot(
+                            true_values_clean,
+                            imputed_values_clean,
+                            central_plots_root,
+                            site_name,
+                            target_column,
+                            model_name_with_regime,
+                            missingness,
+                            rmse=metrics.get("Root Mean Squared Error (RMSE)"),
+                            r=metrics.get("Correlation Coefficient (R)"),
+                        )
+                        save_error_distribution(
+                            true_values_clean,
+                            imputed_values_clean,
+                            central_plots_root,
+                            site_name,
+                            target_column,
+                            model_name_with_regime,
+                            missingness,
+                        )
+                        save_residual_plot(
+                            true_values_clean,
+                            imputed_values_clean,
+                            central_plots_root,
+                            site_name,
+                            target_column,
+                            model_name_with_regime,
+                            missingness,
+                        )
+                        save_qq_plot(
+                            imputed_values_clean,
+                            central_plots_root,
+                            site_name,
+                            target_column,
+                            model_name_with_regime,
+                            missingness,
+                        )
+                        save_correlation_heatmap(
+                            imputed_data,
+                            central_plots_root,
+                            site_name,
+                            target_column,
+                            model_name_with_regime,
+                            missingness,
+                        )
+                        save_statistical_summary(
+                            data_copy,
+                            imputed_data,
+                            central_plots_root,
+                            site_name,
+                            target_column,
+                            model_name_with_regime,
+                            missingness,
+                        )
+                        save_cdf_plot(
+                            true_values_clean,
+                            imputed_values_clean,
+                            central_plots_root,
+                            site_name,
+                            target_column,
+                            model_name_with_regime,
+                            missingness,
+                        )
+                        save_histogram(
+                            data_copy,
+                            imputed_values_clean,
+                            central_plots_root,
+                            site_name,
+                            target_column,
+                            model_name_with_regime,
+                            missingness,
+                        )
+                    except Exception as e:
+                        logging.error("Error generating plots: %s", e)
             else:
                 logging.warning(
                     "No valid simulated values after negative filtering; "

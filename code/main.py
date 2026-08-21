@@ -23,9 +23,22 @@ import traceback
 from datetime import datetime
 import aggregate_metrics
 import numpy as np
+from pandas.errors import EmptyDataError
 from typing import Callable
 import shutil
 import inspect
+import warnings
+import fcntl
+from pathlib import Path
+from contextlib import contextmanager
+from contextvars import ContextVar
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+warnings.filterwarnings(
+    "ignore",
+    category=UserWarning,
+    module=r"sklearn\.utils\.parallel",
+)
 
 # Ensure local imports work when running from repo root (common in SLURM).
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -50,6 +63,396 @@ def _canon_token(s: str) -> str:
     return re.sub(r"[^A-Za-z0-9]+", "", str(s).upper())
 
 
+def _safe_output_token(value) -> str:
+    token = re.sub(r"[^A-Za-z0-9._-]+", "_", str(value).strip())
+    return token or "UNKNOWN"
+
+
+def _target_run_token() -> str:
+    targets = list(getattr(config, "TARGET_COLUMNS", []) or [])
+    if len(targets) == 1:
+        return _safe_output_token(targets[0])
+    return "all_targets"
+
+
+def _aquistil_ablation_models() -> list[str]:
+    return list(dict.fromkeys(getattr(config, "AQUISTIL_ABLATION_MODELS", []) or []))
+
+
+def _aquistil_ablation_assessment_models() -> list[str]:
+    return list(
+        dict.fromkeys(
+            ["AQUISTIL"] + _aquistil_ablation_models() + ["LightGBM"]
+        )
+    )
+
+
+def _aquistil_ablation_metrics_dir(default_metrics_dir: str) -> str:
+    if not _ablation_run_requested():
+        return default_metrics_dir
+    configured = getattr(config, "AQUISTIL_ABLATION_METRICS_DIRECTORY", "")
+    return os.path.abspath(configured or default_metrics_dir)
+
+
+def _without_aquistil_ablations(metrics: pd.DataFrame) -> pd.DataFrame:
+    if metrics is None or metrics.empty or "Model" not in metrics.columns:
+        return metrics
+    return metrics.loc[~metrics["Model"].isin(_aquistil_ablation_models())].copy()
+
+
+def _normal_comparison_models() -> list[str]:
+    configured = getattr(config, "COMPARISON_MODELS", config.MODELS_TO_RUN)
+    ablations = set(_aquistil_ablation_models())
+    return [model for model in dict.fromkeys(configured) if model not in ablations]
+
+
+def _ablation_run_requested() -> bool:
+    configured = set(getattr(config, "MODELS_TO_RUN", []) or [])
+    return bool(configured.intersection(_aquistil_ablation_models()))
+
+
+def _validate_frozen_validation_protocol(args) -> None:
+    """Reject run-time drift or development-region contamination."""
+    if not getattr(config, "FROZEN_VALIDATION_MODE", False):
+        return
+
+    expected_models = ["AQUISTIL", "LightGBM"]
+    expected_targets = {"PM10", "PM2.5"}
+    expected_regimes = {"random", "short_gap", "medium_gap", "long_gap", "event"}
+    expected_levels = {0.05, 0.10, 0.20, 0.30}
+    expected_seeds = {13, 29, 42, 77, 101, 137, 211, 307, 401, 503}
+    expected_regions = set(getattr(config, "HELD_OUT_VALIDATION_REGIONS", []) or [])
+    development_regions = set(getattr(config, "DEVELOPMENT_REGIONS", []) or [])
+    selected_regions = set(getattr(config, "SELECT_TARGET_REGIONS", []) or [])
+    selected_targets = set(getattr(config, "TARGET_COLUMNS", []) or [])
+    errors = []
+
+    if list(getattr(config, "MODELS_TO_RUN", []) or []) != expected_models:
+        errors.append("models must be exactly AQUISTIL and LightGBM")
+    if not selected_targets or not selected_targets.issubset(expected_targets):
+        errors.append("targets must be PM10 and/or PM2.5")
+    if selected_regions != expected_regions:
+        errors.append("selected regions must exactly match HELD_OUT_VALIDATION_REGIONS")
+    overlap = selected_regions.intersection(development_regions)
+    if overlap:
+        errors.append("development regions selected: %s" % sorted(overlap))
+    if set(getattr(config, "MISSINGNESS_REGIMES", []) or []) != expected_regimes:
+        errors.append("missingness regimes differ from the frozen five-regime protocol")
+    if set(map(float, getattr(config, "MISSINGNESS_LEVELS", []) or [])) != expected_levels:
+        errors.append("missingness levels differ from the frozen four-level protocol")
+    if set(map(int, getattr(config, "REGIONAL_EVALUATION_SEEDS", []) or [])) != expected_seeds:
+        errors.append("evaluation seeds differ from the frozen ten-seed protocol")
+    if getattr(config, "RUN_AQUISTIL_ABLATIONS", False):
+        errors.append("AQUISTIL ablations must be disabled")
+    if not getattr(config, "AQUISTIL_REGIME_AWARE_ENABLED", False):
+        errors.append("the frozen AQUISTIL router is disabled")
+    if getattr(config, "AQUISTIL_GAP_EXPERT_MIN_RUN_LENGTH", None) != getattr(
+        config, "FROZEN_GAP_EXPERT_MIN_RUN_LENGTH", None
+    ):
+        errors.append("AQUISTIL gap-expert threshold differs from the frozen value")
+    if os.path.abspath(config.OUTPUT_DIRECTORY) != os.path.abspath(
+        getattr(config, "FROZEN_OUTPUT_DIRECTORY", config.OUTPUT_DIRECTORY)
+    ):
+        errors.append("output directory differs from FROZEN_OUTPUT_DIRECTORY")
+    if args.refresh_api_inputs:
+        errors.append("API refresh is forbidden during frozen validation")
+
+    if errors:
+        raise RuntimeError("Frozen validation protocol violation: " + "; ".join(errors))
+
+
+def _upsert_aquistil_ablation_metrics(
+    current_metrics: pd.DataFrame,
+    metrics_dir: str,
+) -> pd.DataFrame:
+    """Persist ablation assessment rows without contaminating paper metrics."""
+    ablation_models = _aquistil_ablation_models()
+    if (
+        current_metrics is None
+        or current_metrics.empty
+        or "Model" not in current_metrics.columns
+        or not ablation_models
+    ):
+        return pd.DataFrame()
+
+    assessment_models = (
+        _aquistil_ablation_assessment_models()
+        if _ablation_run_requested()
+        else ablation_models
+    )
+    ablation_metrics = current_metrics.loc[
+        current_metrics["Model"].isin(assessment_models)
+    ].copy()
+    if ablation_metrics.empty:
+        return ablation_metrics
+
+    metrics_dir = _aquistil_ablation_metrics_dir(metrics_dir)
+    os.makedirs(metrics_dir, exist_ok=True)
+    output_path = os.path.join(metrics_dir, "aquistil_ablation_metrics.csv")
+    with _exclusive_file_lock(output_path + ".lock"):
+        merged = aggregate_metrics.upsert_regional_metrics(output_path, ablation_metrics)
+        merged.to_csv(output_path, index=False)
+
+    if "Target" in ablation_metrics.columns:
+        for target, target_metrics in ablation_metrics.groupby(
+            "Target", sort=True, dropna=False
+        ):
+            target_path = os.path.join(
+                metrics_dir,
+                f"aquistil_ablation_metrics_{_safe_output_token(target)}.csv",
+            )
+            with _exclusive_file_lock(target_path + ".lock"):
+                target_merged = aggregate_metrics.upsert_regional_metrics(
+                    target_path, target_metrics
+                )
+                target_merged.to_csv(target_path, index=False)
+
+    logging.info(
+        "Saved dedicated AQUISTIL ablation metrics: %s "
+        "(%d current rows, %d total rows)",
+        output_path,
+        len(ablation_metrics),
+        len(merged),
+    )
+    return merged
+
+
+def _write_aquistil_ablation_comparison(
+    regional_metrics: pd.DataFrame,
+    metrics_dir: str,
+) -> pd.DataFrame:
+    """Write paired full-model, ablation, and LightGBM metrics when complete."""
+    models = _aquistil_ablation_assessment_models()
+    if regional_metrics is None or regional_metrics.empty or len(models) < 3:
+        return pd.DataFrame()
+
+    metrics_dir = _aquistil_ablation_metrics_dir(metrics_dir)
+    dedicated_path = os.path.join(metrics_dir, "aquistil_ablation_metrics.csv")
+    comparison_source = regional_metrics.copy()
+    if os.path.exists(dedicated_path):
+        comparison_source = pd.concat(
+            [comparison_source, pd.read_csv(dedicated_path)],
+            ignore_index=True,
+            sort=False,
+        )
+        comparison_source = aggregate_metrics.upsert_regional_metrics(
+            pd.DataFrame(), comparison_source
+        )
+
+    comparison_path = os.path.join(
+        metrics_dir, "aquistil_ablation_comparison.csv"
+    )
+    comparison = aggregate_metrics.write_models_comparison(
+        comparison_source,
+        comparison_path,
+        models,
+    )
+    logging.info(
+        "Saved paired AQUISTIL ablation comparison: %s (%d rows)",
+        comparison_path,
+        len(comparison),
+    )
+    return comparison
+
+
+def _load_persisted_standard_metrics(metrics_dir: str) -> pd.DataFrame:
+    metrics_path = os.path.join(metrics_dir, "regional_pooled_metrics.csv")
+    if os.path.exists(metrics_path):
+        return _without_aquistil_ablations(pd.read_csv(metrics_path))
+
+    frames = []
+    for path in sorted(Path(metrics_dir).glob("regional_pooled_metrics_*.csv")):
+        frames.append(pd.read_csv(path))
+    if not frames:
+        return pd.DataFrame()
+    return _without_aquistil_ablations(
+        pd.concat(frames, ignore_index=True, sort=False)
+    )
+
+
+def _load_aquistil_ablation_resume_metrics(metrics_dir: str) -> pd.DataFrame:
+    """Seed and load the seven-model assessment dataset for task resumption."""
+    if not _ablation_run_requested():
+        return pd.DataFrame()
+
+    ablation_metrics_dir = _aquistil_ablation_metrics_dir(metrics_dir)
+    standard_path = os.path.join(
+        ablation_metrics_dir, "regional_pooled_metrics.csv"
+    )
+    if os.path.exists(standard_path):
+        standard_metrics = _without_aquistil_ablations(pd.read_csv(standard_path))
+        _upsert_aquistil_ablation_metrics(standard_metrics, metrics_dir)
+
+    dedicated_path = os.path.join(
+        ablation_metrics_dir, "aquistil_ablation_metrics.csv"
+    )
+    if not os.path.exists(dedicated_path):
+        return pd.DataFrame()
+    return pd.read_csv(dedicated_path)
+
+
+def _ablation_task_is_complete(
+    metrics: pd.DataFrame,
+    region: str,
+    target: str,
+    model: str,
+) -> bool:
+    """Return True only when every configured evaluation key is persisted."""
+    if metrics is None or metrics.empty:
+        return False
+    required = {
+        "Region", "Site", "Target", "Model", "Regime",
+        "Missingness_Level", "Seed", "Scope",
+    }
+    if not required.issubset(metrics.columns):
+        return False
+
+    selected = metrics.loc[
+        metrics["Region"].map(_canon_token).eq(_canon_token(region))
+        & metrics["Target"].map(_canon_token).eq(_canon_token(target))
+        & metrics["Model"].astype(str).eq(str(model))
+    ].copy()
+    if selected.empty or set(selected["Scope"].dropna()) != {
+        "Site", "Region_Macro", "Region_Micro"
+    }:
+        return False
+
+    reference = metrics.loc[
+        metrics["Region"].map(_canon_token).eq(_canon_token(region))
+        & metrics["Target"].map(_canon_token).eq(_canon_token(target))
+        & metrics["Model"].astype(str).eq("AQUISTIL")
+        & metrics["Scope"].eq("Site")
+    ]
+    if model != "AQUISTIL" and reference.empty:
+        return False
+    if not reference.empty:
+        expected_sites = set(reference["Site"].dropna().astype(str))
+        actual_sites = set(
+            selected.loc[selected["Scope"].eq("Site"), "Site"]
+            .dropna()
+            .astype(str)
+        )
+        if actual_sites != expected_sites:
+            return False
+
+    expected_grid = {
+        (str(regime), round(float(level), 12), int(seed))
+        for regime in getattr(config, "MISSINGNESS_REGIMES", [])
+        for level in getattr(config, "MISSINGNESS_LEVELS", [])
+        for seed in getattr(config, "REGIONAL_EVALUATION_SEEDS", [])
+    }
+    if not expected_grid:
+        return False
+
+    identity = [
+        "Region", "Site", "Target", "Model", "Regime",
+        "Missingness_Level", "Seed", "Scope",
+    ]
+    if selected.duplicated(identity).any():
+        return False
+    for (_, _), group in selected.groupby(["Scope", "Site"], dropna=False):
+        actual_grid = {
+            (str(row.Regime), round(float(row.Missingness_Level), 12), int(row.Seed))
+            for row in group.itertuples()
+        }
+        if actual_grid != expected_grid:
+            return False
+    return True
+
+
+def _finalize_aquistil_ablation_outputs(metrics_dir: str, results_root: str) -> None:
+    if not _ablation_run_requested():
+        return
+    ablation_metrics_dir = _aquistil_ablation_metrics_dir(metrics_dir)
+    dedicated_path = os.path.join(
+        ablation_metrics_dir, "aquistil_ablation_metrics.csv"
+    )
+    standard_frames = [_load_persisted_standard_metrics(metrics_dir)]
+    if os.path.exists(dedicated_path):
+        standard_frames.append(
+            _without_aquistil_ablations(pd.read_csv(dedicated_path))
+        )
+    standard_frames = [frame for frame in standard_frames if not frame.empty]
+    standard_metrics = (
+        aggregate_metrics.upsert_regional_metrics(
+            pd.DataFrame(),
+            pd.concat(standard_frames, ignore_index=True, sort=False),
+        )
+        if standard_frames
+        else pd.DataFrame()
+    )
+    if standard_metrics.empty:
+        raise ValueError(
+            "Cannot finalize AQUISTIL ablations without persisted AQUISTIL and "
+            "LightGBM regional metrics"
+        )
+    _write_aquistil_ablation_comparison(standard_metrics, metrics_dir)
+
+    from tools.summarize_aquistil_ablation import write_summary_files
+
+    written_summaries = write_summary_files(
+        Path(results_root),
+        scope="All",
+        metrics_dir=Path(ablation_metrics_dir),
+    )
+    logging.info(
+        "Saved complete AQUISTIL ablation summaries: %s",
+        ", ".join(str(path) for path in written_summaries.values()),
+    )
+
+
+def _write_regional_metrics_by_target(regional_metrics: pd.DataFrame, metrics_dir: str) -> None:
+    if regional_metrics is None or regional_metrics.empty or "Target" not in regional_metrics.columns:
+        return
+    regional_metrics = _without_aquistil_ablations(regional_metrics)
+    os.makedirs(metrics_dir, exist_ok=True)
+    for target, target_metrics in regional_metrics.groupby("Target", sort=True, dropna=False):
+        target_path = os.path.join(
+            metrics_dir,
+            f"regional_pooled_metrics_{_safe_output_token(target)}.csv",
+        )
+        target_metrics.to_csv(target_path, index=False)
+        logging.info(
+            "Saved regional metrics for %s: %s (%d rows)",
+            target,
+            target_path,
+            len(target_metrics),
+        )
+
+
+def _upsert_regional_metrics_by_target(current_metrics: pd.DataFrame, metrics_dir: str) -> None:
+    if current_metrics is None or current_metrics.empty or "Target" not in current_metrics.columns:
+        return
+    os.makedirs(metrics_dir, exist_ok=True)
+    for target, target_metrics in current_metrics.groupby("Target", sort=True, dropna=False):
+        target_path = os.path.join(
+            metrics_dir,
+            f"regional_pooled_metrics_{_safe_output_token(target)}.csv",
+        )
+        with _exclusive_file_lock(target_path + ".lock"):
+            merged = aggregate_metrics.upsert_regional_metrics(target_path, target_metrics)
+            merged = _without_aquistil_ablations(merged)
+            merged.to_csv(target_path, index=False)
+        logging.info(
+            "Upserted regional metrics for %s: %s (%d current rows, %d total rows)",
+            target,
+            target_path,
+            len(target_metrics),
+            len(merged),
+        )
+
+
+@contextmanager
+def _exclusive_file_lock(lock_path: str):
+    os.makedirs(os.path.dirname(os.path.abspath(lock_path)), exist_ok=True)
+    with open(lock_path, "w") as lock_file:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+
 def _region_token_from_config_region(region_name: str) -> str:
     """Convert config region label (e.g., 'Sydney North-west') into token used by inputs/JSON.
 
@@ -65,6 +468,9 @@ def _region_token_from_config_region(region_name: str) -> str:
 
 
 def _load_best_predictors_json(path: str) -> dict:
+    if not path or not os.path.exists(path):
+        logging.info("BEST_PREDICTORS_JSON not found; using configured feature fallbacks: %s", path)
+        return {}
     try:
         import json
 
@@ -85,7 +491,108 @@ def _get_predictors_for_region_target(best_map: dict, region_token: str, target:
     return list(region_block.get(target, []) or [])
 
 
-def _load_progressive_best_features(path: str) -> dict:
+def _target_output_token(target: str) -> str:
+    return str(target).replace(".", "_")
+
+
+def _allocated_cpu_count() -> int:
+    """Return the scheduler/cpuset CPU allocation visible to this process."""
+    for env_name in ("SLURM_CPUS_PER_TASK", "PBS_NP", "NSLOTS"):
+        try:
+            value = int(os.environ.get(env_name, ""))
+        except (TypeError, ValueError):
+            continue
+        if value > 0:
+            return value
+    try:
+        return max(1, len(os.sched_getaffinity(0)))
+    except (AttributeError, OSError):
+        return max(1, os.cpu_count() or 1)
+
+
+def _resolve_target_parallelism(
+    target_count: int,
+    task_count: int,
+    requested_workers: int,
+    requested_model_n_jobs: int,
+    available_cpus: int,
+) -> tuple:
+    """Bound target workers and divide the CPU allocation between them."""
+    target_count = max(1, int(target_count))
+    task_count = max(1, int(task_count))
+    available_cpus = max(1, int(available_cpus))
+    requested_workers = max(1, int(requested_workers or 1))
+    # A task is one independent region-target evaluation. Multiple regions for
+    # the same target can run concurrently without changing masks or models.
+    workers = min(requested_workers, task_count, available_cpus)
+
+    requested_model_n_jobs = int(requested_model_n_jobs or 0)
+    if requested_model_n_jobs > 0:
+        model_n_jobs = min(requested_model_n_jobs, available_cpus)
+    else:
+        model_n_jobs = max(1, available_cpus // workers)
+    return workers, model_n_jobs
+
+
+def _stage3_best_csv_candidates_for_target(target: str) -> list:
+    target_names = list(dict.fromkeys([str(target), _target_output_token(target)]))
+    return [
+        os.path.join(
+            os.path.dirname(THIS_DIR),
+            "Outputs",
+            "Feature_Selection",
+            "by_target",
+            target_name,
+            "03Regional_Selected_Feature_Progressive_Evaluation",
+            "summary_outputs",
+            "regional_progressive_best_configuration_by_region.csv",
+        )
+        for target_name in target_names
+    ]
+
+
+def _stage3_best_csv_for_target(target: str) -> str:
+    if getattr(config, "RUN_AQUISTIL_ABLATIONS", False):
+        ablation_files = getattr(
+            config, "DEVELOPMENT_ABLATION_STAGE3_FEATURE_FILES", {}
+        ) or {}
+        ablation_path = ablation_files.get(str(target))
+        if not ablation_path or not os.path.isfile(ablation_path):
+            raise FileNotFoundError(
+                "Development ablation Stage 3 feature selection is missing for %s: %s"
+                % (target, ablation_path)
+            )
+        return ablation_path
+    if getattr(config, "FROZEN_VALIDATION_MODE", False):
+        frozen_files = getattr(config, "FROZEN_STAGE3_FEATURE_FILES", {}) or {}
+        frozen_path = frozen_files.get(str(target))
+        if not frozen_path or not os.path.isfile(frozen_path):
+            raise FileNotFoundError(
+                "Frozen Stage 3 feature selection is missing for %s: %s"
+                % (target, frozen_path)
+            )
+        return frozen_path
+    candidates = _stage3_best_csv_candidates_for_target(target)
+    for path in candidates:
+        if os.path.isfile(path):
+            return path
+    return candidates[-1]
+
+
+def _stage3_best_csv_display_path_for_target(target: str) -> str:
+    return os.path.join(
+        os.path.dirname(THIS_DIR),
+        "Outputs",
+        "Feature_Selection",
+        "by_target",
+        _target_output_token(target),
+        "03Regional_Selected_Feature_Progressive_Evaluation",
+        "summary_outputs",
+        "regional_progressive_best_configuration_by_region.csv",
+    )
+
+
+def _load_progressive_best_features(path: str, implicit_target: str = None) -> dict:
     """Load Stage 3 winning configurations keyed by normalized region/target."""
     if not path or not os.path.isfile(path):
         logging.warning("Stage 3 best-configuration CSV not found: %s", path)
@@ -97,7 +604,8 @@ def _load_progressive_best_features(path: str) -> dict:
         raise ValueError("Stage 3 best-configuration CSV missing columns: %s" % sorted(missing))
     result = {}
     configured_targets = list(getattr(config, "TARGET_COLUMNS", []) or [])
-    implicit_target = configured_targets[0] if len(configured_targets) == 1 else None
+    if implicit_target is None:
+        implicit_target = configured_targets[0] if len(configured_targets) == 1 else None
     for _, row in frame.iterrows():
         target = str(row.get("Target", implicit_target or "")).strip()
         if not target:
@@ -110,8 +618,100 @@ def _load_progressive_best_features(path: str) -> dict:
             "configuration": str(row.get("Configuration", "")).strip(),
             "blocks": str(row.get("Blocks", "")).strip(),
             "features": features,
+            "feature_source": "stage3",
+            "strict_progressive": True,
         }
     return result
+
+
+def _load_progressive_best_features_for_targets(targets: list) -> dict:
+    """Load Stage 3 best configurations, preferring target-specific outputs."""
+    explicit_path = getattr(config, "PROGRESSIVE_BEST_FEATURES_CSV", "")
+
+    combined = {}
+    loaded_paths = []
+    for target in targets:
+        target_path = _stage3_best_csv_for_target(target)
+        target_map = _load_progressive_best_features(target_path, implicit_target=target)
+        combined.update(target_map)
+        if target_map:
+            loaded_paths.append(target_path)
+
+    if combined:
+        logging.info(
+            "Loaded Stage 3 best features from %d target-specific CSV(s): %s",
+            len(loaded_paths),
+            loaded_paths,
+        )
+        return combined
+
+    if os.environ.get("PROGRESSIVE_BEST_FEATURES_CSV"):
+        logging.info(
+            "No target-specific Stage 3 CSVs were loaded; trying explicit PROGRESSIVE_BEST_FEATURES_CSV=%s",
+            explicit_path,
+        )
+    return _load_progressive_best_features(explicit_path)
+
+
+def _generic_regional_feature_choice(region_token: str, target: str) -> dict:
+    """Build the configured last-resort fallback contract for a region missing Stage 3."""
+    if not getattr(config, "FALLBACK_TO_INPUT_COLUMNS_WHEN_MISSING", True):
+        return {}
+    candidates = list(
+        getattr(
+            config,
+            "REGIONAL_GENERIC_FEATURES",
+            getattr(config, "LOCAL_ANALYSIS_INPUTS", getattr(config, "INPUT_COLUMNS", [])),
+        )
+        or []
+    )
+    features = list(
+        dict.fromkeys(
+            feature
+            for feature in candidates
+            if str(feature).strip() and _canon_token(feature) != _canon_token(target)
+        )
+    )
+    if not features:
+        return {}
+    return {
+        "region": str(region_token).replace("_", " "),
+        "configuration": "Generic_Local_Feature_Fallback",
+        "blocks": "LOCAL_GENERIC",
+        "features": features,
+        "feature_source": "generic_fallback",
+        "strict_progressive": False,
+    }
+
+
+def _borrow_stage3_regional_feature_choice(
+    progressive_best_map: dict,
+    region_token: str,
+    target: str,
+) -> dict:
+    """Reuse an available Stage 3 feature set for a region missing Stage 3."""
+    if not getattr(config, "FALLBACK_TO_INPUT_COLUMNS_WHEN_MISSING", True):
+        return {}
+
+    target_key = _canon_token(target)
+    candidates = [
+        choice for (choice_region, choice_target), choice in sorted(progressive_best_map.items())
+        if choice_target == target_key and choice.get("features")
+    ]
+    if not candidates:
+        return _generic_regional_feature_choice(region_token, target)
+
+    source = dict(candidates[0])
+    borrowed = dict(source)
+    borrowed["region"] = str(region_token).replace("_", " ")
+    borrowed["source_region"] = source.get("region", "")
+    borrowed["configuration"] = "Borrowed_Stage3_{region}_{configuration}".format(
+        region=_canon_token(source.get("region", "available_region")),
+        configuration=source.get("configuration", "") or "configuration",
+    )
+    borrowed["feature_source"] = "stage3_borrowed"
+    borrowed["strict_progressive"] = True
+    return borrowed
 
 
 def _add_progressive_derived_features(
@@ -169,7 +769,11 @@ def _add_progressive_derived_features(
         distance = distance_km(target_coord, neighbor_coord)
         if not (0 < distance <= max_distance):
             continue
-        neighbor = pd.read_csv(neighbor_path, usecols=lambda c: c in {"DateTime", target})
+        try:
+            neighbor = pd.read_csv(neighbor_path, usecols=lambda c: c in {"DateTime", target})
+        except EmptyDataError:
+            logging.warning("Skipping empty IDW neighbor cache file: %s", neighbor_path)
+            continue
         if "DateTime" not in neighbor.columns or target not in neighbor.columns:
             continue
         neighbor["DateTime"] = pd.to_datetime(neighbor["DateTime"], errors="coerce")
@@ -280,6 +884,140 @@ def _list_sites_from_wide_csv(wide_csv_path: str) -> list:
     return sorted(sites)
 
 
+def _reindex_to_complete_hourly_grid(df: pd.DataFrame, context: str) -> pd.DataFrame:
+    """Make one row represent exactly one hour, preserving existing columns."""
+    out = df.copy()
+    original_rows = len(out)
+    out["DateTime"] = pd.to_datetime(out["DateTime"], errors="coerce")
+    out = out.dropna(subset=["DateTime"]).sort_values("DateTime")
+    duplicate_count = int(out["DateTime"].duplicated(keep="last").sum())
+    if duplicate_count:
+        numeric_cols = [c for c in out.columns if c != "DateTime"]
+        out[numeric_cols] = out[numeric_cols].apply(pd.to_numeric, errors="coerce")
+        out = out.groupby("DateTime", as_index=False, sort=True).mean(numeric_only=True)
+
+    if out.empty:
+        logging.warning("Hourly grid skipped for empty data: %s", context)
+        return out
+
+    original_diffs = out["DateTime"].diff().dropna()
+    max_gap = original_diffs.max() if not original_diffs.empty else pd.Timedelta(0)
+    original_unique_timestamps = int(out["DateTime"].nunique())
+    hourly_grid = pd.date_range(out["DateTime"].min(), out["DateTime"].max(), freq="h")
+    out = out.set_index("DateTime").reindex(hourly_grid)
+    out.index.name = "DateTime"
+    out = out.reset_index()
+    inserted = len(out) - original_unique_timestamps
+    logging.info(
+        "Hourly grid %s | original_rows=%d hourly_grid_rows=%d inserted_timestamps=%d "
+        "duplicate_timestamps=%d max_original_timestamp_gap=%s",
+        context,
+        original_rows,
+        len(out),
+        max(0, int(inserted)),
+        duplicate_count,
+        max_gap,
+    )
+    return out
+
+
+def _largest_missing_episode(mask) -> tuple:
+    values = np.asarray(mask, dtype=bool)
+    if not values.any():
+        return 0, 0
+    starts = np.flatnonzero(values & ~np.r_[False, values[:-1]])
+    ends = np.flatnonzero(values & ~np.r_[values[1:], False])
+    lengths = ends - starts + 1
+    return int(lengths.max()), int(len(lengths))
+
+
+def _write_air_quality_qc_report(regional_data: pd.DataFrame, output_root: str) -> None:
+    """Write source-QA diagnostics without mutating or filtering observations."""
+    targets = [t for t in getattr(config, "TARGET_COLUMNS", []) if t in regional_data.columns]
+    if not targets or regional_data.empty:
+        return
+    qc_dir = os.path.join(output_root, "Data_QC")
+    os.makedirs(qc_dir, exist_ok=True)
+    summary_rows, flag_rows = [], []
+    data = regional_data.copy()
+    data["DateTime"] = pd.to_datetime(data["DateTime"], errors="coerce")
+
+    for (region, site), site_data in data.groupby(["Region", "Site"], sort=False):
+        site_data = site_data.sort_values("DateTime")
+        for target in targets:
+            series = pd.to_numeric(site_data[target], errors="coerce")
+            largest_episode, episode_count = _largest_missing_episode(series.isna().to_numpy())
+            observed = series.dropna()
+            summary_rows.append(
+                {
+                    "Region": region,
+                    "Site": site,
+                    "Target": target,
+                    "N": int(len(series)),
+                    "Missing_Percent": float(series.isna().mean() * 100) if len(series) else np.nan,
+                    "Minimum": float(observed.min()) if len(observed) else np.nan,
+                    "Mean": float(observed.mean()) if len(observed) else np.nan,
+                    "Median": float(observed.median()) if len(observed) else np.nan,
+                    "SD": float(observed.std()) if len(observed) > 1 else np.nan,
+                    "P95": float(observed.quantile(0.95)) if len(observed) else np.nan,
+                    "P99": float(observed.quantile(0.99)) if len(observed) else np.nan,
+                    "P99_5": float(observed.quantile(0.995)) if len(observed) else np.nan,
+                    "Maximum": float(observed.max()) if len(observed) else np.nan,
+                    "Negative_Observations": int((observed < 0).sum()),
+                    "Largest_Natural_Missing_Episode": largest_episode,
+                    "Missing_Episodes": episode_count,
+                }
+            )
+            if len(observed) < 8:
+                continue
+            median = observed.median()
+            mad = (observed - median).abs().median()
+            q1, q3 = observed.quantile([0.25, 0.75])
+            iqr = q3 - q1
+            p995 = observed.quantile(0.995)
+            robust_z = 0.6745 * (series - median) / mad if mad and mad > 0 else pd.Series(np.nan, index=series.index)
+            iqr_limit = q3 + 6 * iqr if iqr and iqr > 0 else np.inf
+            quantile_limit = max(p995, observed.quantile(0.99) * 1.5)
+            flags = (robust_z > 12) | (series > iqr_limit) | (series > quantile_limit)
+            for idx in site_data.index[flags.fillna(False)]:
+                row_pos = site_data.index.get_loc(idx)
+                flag_rows.append(
+                    {
+                        "Region": region,
+                        "Site": site,
+                        "Target": target,
+                        "DateTime": site_data.loc[idx, "DateTime"],
+                        "Value": series.loc[idx],
+                        "Robust_Z": robust_z.loc[idx],
+                        "IQR_High_Limit": iqr_limit,
+                        "P99_5": p995,
+                        "Same_Site_PM2_5": site_data.loc[idx, "PM2.5"] if "PM2.5" in site_data.columns else np.nan,
+                        "Same_Site_NEPH": site_data.loc[idx, "NEPH"] if "NEPH" in site_data.columns else np.nan,
+                        "Previous_Target_Value": series.iloc[row_pos - 1] if row_pos > 0 else np.nan,
+                        "Next_Target_Value": series.iloc[row_pos + 1] if row_pos + 1 < len(series) else np.nan,
+                    }
+                )
+
+    summary_path = os.path.join(qc_dir, "site_target_summary.csv")
+    flags_path = os.path.join(qc_dir, "extreme_value_flags.csv")
+    summary = pd.DataFrame(summary_rows)
+    flags = pd.DataFrame(flag_rows)
+    if os.path.exists(summary_path):
+        summary = pd.concat([pd.read_csv(summary_path), summary], ignore_index=True, sort=False)
+        summary = summary.drop_duplicates(["Region", "Site", "Target"], keep="last")
+    if os.path.exists(flags_path) and not flags.empty:
+        flags = pd.concat([pd.read_csv(flags_path), flags], ignore_index=True, sort=False)
+        flags = flags.drop_duplicates(["Region", "Site", "Target", "DateTime", "Value"], keep="last")
+    summary.to_csv(summary_path, index=False)
+    flags.to_csv(flags_path, index=False)
+    logging.info(
+        "Saved air-quality QC diagnostics: %s (%d summaries, %d extreme flags)",
+        qc_dir,
+        len(summary_rows),
+        len(flag_rows),
+    )
+
+
 def _build_site_region_index(region_files: list) -> dict:
     site_map = {}
     for region_token, wide_fp in region_files:
@@ -374,11 +1112,16 @@ def _build_per_site_csv_from_wide(
 
     # Clean + enforce datetime
     sub["DateTime"] = pd.to_datetime(sub["DateTime"], errors="coerce")
-    sub = sub.dropna(subset=["DateTime"]).sort_values("DateTime")
+    sub = _reindex_to_complete_hourly_grid(
+        sub,
+        context="%s/%s" % (_wide_region_token_from_path(wide_csv_path), site_name),
+    )
 
     safe_site = re.sub(r"[^A-Za-z0-9]+", "_", site_name.strip())
     out_path = os.path.join(out_dir, f"{safe_site}.csv")
-    sub.to_csv(out_path, index=False)
+    tmp_path = f"{out_path}.{os.getpid()}.tmp"
+    sub.to_csv(tmp_path, index=False)
+    os.replace(tmp_path, out_path)
     return out_path
 
 # ------------------------------------------------------------------------------
@@ -409,11 +1152,91 @@ RESEARCH_PLOTS_DIR = os.path.join(RESULTS_ROOT, "Research_Plots")
 log_file = os.path.join(RESULTS_ROOT, 'imputation_framework.log')
 os.makedirs(RESULTS_ROOT, exist_ok=True)
 
+_LOG_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
+_CURRENT_LOG_TARGET = ContextVar("aquistil_log_target", default=None)
+
+
+class _TargetLogFilter(logging.Filter):
+    """Route records emitted inside one target worker to its target log."""
+
+    def __init__(self, target):
+        super().__init__()
+        self.target = str(target)
+
+    def filter(self, record):
+        return _CURRENT_LOG_TARGET.get() == self.target
+
+
+@contextmanager
+def _target_logging_context(target):
+    token = _CURRENT_LOG_TARGET.set(str(target))
+    try:
+        yield
+    finally:
+        _CURRENT_LOG_TARGET.reset(token)
+
+
+def _add_target_log_handlers(targets, target_log_root):
+    """Attach one filtered file handler per target and return newly added handlers."""
+    os.makedirs(target_log_root, exist_ok=True)
+    root_logger = logging.getLogger()
+    formatter = logging.Formatter(_LOG_FORMAT)
+    existing_paths = {
+        os.path.abspath(handler.baseFilename)
+        for handler in root_logger.handlers
+        if isinstance(handler, logging.FileHandler)
+    }
+    added_handlers = []
+
+    for target in targets:
+        safe_target = re.sub(r"[^A-Za-z0-9._-]+", "_", str(target)).strip("._")
+        target_log_path = os.path.abspath(
+            os.path.join(target_log_root, f"{safe_target or 'target'}.log")
+        )
+        if target_log_path in existing_paths:
+            continue
+
+        handler = logging.FileHandler(target_log_path)
+        handler.setLevel(getattr(logging, getattr(config, "LOG_LEVEL", "INFO")))
+        handler.setFormatter(formatter)
+        handler.addFilter(_TargetLogFilter(target))
+        root_logger.addHandler(handler)
+        existing_paths.add(target_log_path)
+        added_handlers.append(handler)
+
+    return added_handlers
+
+
+log_level = getattr(logging, getattr(config, "LOG_LEVEL", "INFO"))
 logging.basicConfig(
-    level=getattr(logging, getattr(config, "LOG_LEVEL", "INFO")),
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(), logging.FileHandler(log_file)]
+    level=log_level,
+    format=_LOG_FORMAT,
 )
+root_logger = logging.getLogger()
+root_logger.setLevel(log_level)
+
+# Imported modules may have already called basicConfig, so add the framework
+# file handler explicitly instead of relying on another basicConfig call.
+if not any(
+    isinstance(handler, logging.FileHandler)
+    and os.path.abspath(handler.baseFilename) == os.path.abspath(log_file)
+    for handler in root_logger.handlers
+):
+    framework_handler = logging.FileHandler(log_file)
+    framework_handler.setLevel(log_level)
+    framework_handler.setFormatter(logging.Formatter(_LOG_FORMAT))
+    root_logger.addHandler(framework_handler)
+
+TARGET_LOG_ROOT = os.path.join(
+    RESULTS_ROOT,
+    getattr(config, "TARGET_LOG_SUBDIR", os.path.join("Logs", "By_Target")),
+)
+if getattr(config, "SEPARATE_TARGET_LOGS", True):
+    _add_target_log_handlers(
+        getattr(config, "TARGET_COLUMNS", []),
+        TARGET_LOG_ROOT,
+    )
+    logging.info("Per-target model logs enabled: %s", TARGET_LOG_ROOT)
 
 # ------------------------------------------------------------------------------
 # Safety wrapper for imputer callables
@@ -520,7 +1343,7 @@ def get_available_models(dependencies):
     """
     Determine which configured models are available to run.
     """
-    pytorch_models = {"BRITS", "DLV2", "GAIN", "GRIN", "TransformerImpute", "SPIN", "TF_BRITS", "TF_BRITS_sliding"}
+    pytorch_models = {"BRITS", "DLV2", "GAIN", "GRIN", "TransformerImpute", "SPIN"}
     xgboost_models = {"XGBoost"}
     lightgbm_models = {"LightGBM"}
 
@@ -1015,8 +1838,11 @@ def main():
     logging.info("WITH MULTIPLE MISSINGNESS REGIMES")
     logging.info("=" * 80)
 
-    # Ensure central roots exist
-    for d in [MODEL_OUTPUT_ROOT, CENTRAL_METRICS_ROOT, CENTRAL_IMPUTED_ROOT, CENTRAL_PLOTS_ROOT]:
+    # Ensure central roots exist. Plot roots are created only when plot output is enabled.
+    central_roots = [MODEL_OUTPUT_ROOT, CENTRAL_METRICS_ROOT, CENTRAL_IMPUTED_ROOT]
+    if getattr(config, "SAVE_PLOTS", False):
+        central_roots.append(CENTRAL_PLOTS_ROOT)
+    for d in central_roots:
         try:
             os.makedirs(d, exist_ok=True)
         except Exception:
@@ -1045,7 +1871,140 @@ def main():
         default=NOWCASTING_WIDE_INPUT_DIR,
         help='Directory containing Allobs_processed_DPE_station_api_*_ALL.csv wide API inputs.',
     )
+    parser.add_argument(
+        '--target-workers',
+        type=int,
+        default=None,
+        help='Regional pooled target tasks to run concurrently (default: config setting).',
+    )
+    parser.add_argument(
+        '--model-n-jobs',
+        type=int,
+        default=None,
+        help='Native model threads per target worker; 0 divides allocated CPUs automatically.',
+    )
+    parser.add_argument(
+        '--targets',
+        nargs='+',
+        default=None,
+        help='Override config.TARGET_COLUMNS for this run, e.g. --targets PM10 PM2.5 NO2.',
+    )
+    parser.add_argument(
+        '--models',
+        nargs='+',
+        default=None,
+        help='Override config.MODELS_TO_RUN for this run, e.g. --models AQUISTIL LightGBM.',
+    )
+    parser.add_argument(
+        '--run-aquistil-ablations',
+        action='store_true',
+        help=(
+            'Run full AQUISTIL, every configured AQUISTIL ablation, and LightGBM; '
+            'save their metrics and paired summaries separately.'
+        ),
+    )
+    parser.add_argument(
+        '--regions',
+        nargs='+',
+        default=None,
+        help='Override selected regions for this run, e.g. --regions "Sydney North-west".',
+    )
+    parser.add_argument(
+        '--missingness-levels',
+        nargs='+',
+        type=float,
+        default=None,
+        help='Override missingness fractions, e.g. --missingness-levels 0.05 0.10.',
+    )
+    parser.add_argument(
+        '--seeds',
+        nargs='+',
+        type=int,
+        default=None,
+        help='Override regional evaluation seeds for a smoke or reproducibility run.',
+    )
+    parser.add_argument(
+        '--gap-expert-min-run-length',
+        type=int,
+        choices=[2, 3, 6, 12, 24],
+        default=None,
+        help='Development-only global AQUISTIL gap-router threshold in hours.',
+    )
     args = parser.parse_args()
+
+    if args.run_aquistil_ablations and args.models:
+        raise ValueError(
+            "--run-aquistil-ablations cannot be combined with --models"
+        )
+
+    if args.targets:
+        config.TARGET_COLUMNS = [str(target).strip() for target in args.targets if str(target).strip()]
+        if not config.TARGET_COLUMNS:
+            raise ValueError("--targets was supplied but no valid target names were found")
+        if getattr(config, "SEPARATE_TARGET_LOGS", True):
+            _add_target_log_handlers(config.TARGET_COLUMNS, TARGET_LOG_ROOT)
+        logging.info("Overriding TARGET_COLUMNS from command line: %s", config.TARGET_COLUMNS)
+
+    if args.models:
+        config.MODELS_TO_RUN = [str(model).strip() for model in args.models if str(model).strip()]
+        config.STANDALONE_MODELS = []
+        config.COMPARISON_MODELS = list(dict.fromkeys(config.MODELS_TO_RUN))
+        if not config.MODELS_TO_RUN:
+            raise ValueError("--models was supplied but no valid model names were found")
+        logging.info("Overriding MODELS_TO_RUN from command line: %s", config.MODELS_TO_RUN)
+
+    if args.run_aquistil_ablations:
+        config.RUN_AQUISTIL_ABLATIONS = True
+        config.MODELS_TO_RUN = list(
+            dict.fromkeys(
+                ["AQUISTIL"]
+                + _aquistil_ablation_models()
+                + list(getattr(config, "PAPER_BASELINE_MODELS", ["LightGBM"]))
+            )
+        )
+        config.STANDALONE_MODELS = []
+        config.COMPARISON_MODELS = list(config.MODELS_TO_RUN)
+        logging.info(
+            "AQUISTIL ablation run enabled; models: %s", config.MODELS_TO_RUN
+        )
+
+    if args.regions:
+        config.SELECT_TARGET_REGIONS = [
+            str(region).strip() for region in args.regions if str(region).strip()
+        ]
+        if not config.SELECT_TARGET_REGIONS:
+            raise ValueError("--regions was supplied but no valid region names were found")
+        logging.info(
+            "Overriding SELECT_TARGET_REGIONS from command line: %s",
+            config.SELECT_TARGET_REGIONS,
+        )
+
+    if args.missingness_levels is not None:
+        if not args.missingness_levels or any(
+            level <= 0 or level > 1 for level in args.missingness_levels
+        ):
+            raise ValueError("--missingness-levels values must be in (0, 1]")
+        config.MISSINGNESS_LEVELS = list(dict.fromkeys(args.missingness_levels))
+        logging.info(
+            "Overriding MISSINGNESS_LEVELS from command line: %s",
+            config.MISSINGNESS_LEVELS,
+        )
+    if args.seeds is not None:
+        if not args.seeds:
+            raise ValueError("--seeds requires at least one integer")
+        config.REGIONAL_EVALUATION_SEEDS = list(dict.fromkeys(args.seeds))
+        logging.info(
+            "Overriding REGIONAL_EVALUATION_SEEDS from command line: %s",
+            config.REGIONAL_EVALUATION_SEEDS,
+        )
+    if args.gap_expert_min_run_length is not None:
+        config.AQUISTIL_GAP_EXPERT_MIN_RUN_LENGTH = args.gap_expert_min_run_length
+        logging.info(
+            "Overriding AQUISTIL gap-expert threshold: %d hours",
+            config.AQUISTIL_GAP_EXPERT_MIN_RUN_LENGTH,
+        )
+
+    _validate_frozen_validation_protocol(args)
 
     wide_input_dir = os.path.abspath(args.wide_input_dir)
 
@@ -1191,8 +2150,8 @@ def main():
 
     progressive_best_map = {}
     if getattr(config, "USE_PROGRESSIVE_BEST_FEATURES", False):
-        progressive_best_map = _load_progressive_best_features(
-            getattr(config, "PROGRESSIVE_BEST_FEATURES_CSV", "")
+        progressive_best_map = _load_progressive_best_features_for_targets(
+            list(getattr(config, "TARGET_COLUMNS", []) or [])
         )
         logging.info("Loaded %d Stage 3 best region/target configuration(s)", len(progressive_best_map))
 
@@ -1223,7 +2182,12 @@ def main():
             )
             available_sites = get_available_sites(config.INPUT_DIRECTORY)
         else:
-            prepared_wide_site_dir = os.path.join(RESULTS_ROOT, "Inputs_PerSite")
+            target_cache_token = _target_run_token()
+            prepared_wide_site_dir = os.path.join(
+                RESULTS_ROOT,
+                "Inputs_PerSite",
+                target_cache_token,
+            )
             prepared_site_inputs = _materialize_per_site_cache(wide_region_files, prepared_wide_site_dir)
             if prepared_site_inputs:
                 config.INPUT_DIRECTORY = prepared_wide_site_dir
@@ -1235,7 +2199,11 @@ def main():
             )
             if needs_idw:
                 all_region_files = _resolve_region_wide_files(None, wide_dir=wide_input_dir)
-                idw_neighbor_dir = os.path.join(RESULTS_ROOT, "Inputs_IDW_Neighbors")
+                idw_neighbor_dir = os.path.join(
+                    RESULTS_ROOT,
+                    "Inputs_IDW_Neighbors",
+                    target_cache_token,
+                )
                 progressive_neighbor_inputs = _materialize_per_site_cache(
                     all_region_files,
                     idw_neighbor_dir,
@@ -1297,40 +2265,281 @@ def main():
         os.makedirs(regional_output_root, exist_ok=True)
         regional_datasets = {}
         for region_token, _ in wide_region_files:
-            choice = progressive_best_map.get(
-                (_canon_token(region_token), _canon_token(config.TARGET_COLUMNS[0]))
-            )
-            if not choice:
-                logging.warning("No Stage 3 feature selection for region %s; skipping regional model", region_token)
-                continue
-            site_parts = []
-            for site in sites_to_process:
-                meta = wide_site_index.get(_canon_token(site))
-                if not meta or _canon_token(meta["region_token"]) != _canon_token(region_token):
-                    continue
-                path = prepared_site_inputs.get(_canon_token(site))
-                if not path:
-                    continue
-                site_data = pd.read_csv(path)
-                site_data["DateTime"] = pd.to_datetime(site_data["DateTime"], errors="coerce")
-                site_data = _add_progressive_derived_features(
-                    site_data,
-                    site,
-                    config.TARGET_COLUMNS[0],
-                    choice["features"],
-                    progressive_neighbor_inputs or prepared_site_inputs,
+            for target in config.TARGET_COLUMNS:
+                choice = progressive_best_map.get(
+                    (_canon_token(region_token), _canon_token(target))
                 )
-                site_data["Site"] = site
-                site_data["Region"] = region_token.replace("_", " ")
-                site_parts.append(site_data)
-            if site_parts:
-                regional_datasets[region_token] = (pd.concat(site_parts, ignore_index=True), choice)
+                choice = dict(choice) if choice else _borrow_stage3_regional_feature_choice(
+                    progressive_best_map, region_token, target
+                )
+                if not choice:
+                    logging.warning(
+                        "No Stage 3 feature selection for region %s / target %s; skipping regional model",
+                        region_token,
+                        target,
+                    )
+                    continue
+                if choice.get("feature_source") == "stage3_borrowed":
+                    logging.warning(
+                        "No Stage 3 feature selection for region %s / target %s; borrowing Stage 3 features from %s: %s",
+                        region_token,
+                        target,
+                        choice.get("source_region", "available region"),
+                        choice["features"],
+                    )
+                if choice.get("feature_source") == "generic_fallback":
+                    logging.warning(
+                        "No Stage 3 feature selection for any region/target match; using generic regional features for %s / %s: %s",
+                        region_token,
+                        target,
+                        choice["features"],
+                    )
+                site_parts = []
+                for site in sites_to_process:
+                    meta = wide_site_index.get(_canon_token(site))
+                    if not meta or _canon_token(meta["region_token"]) != _canon_token(region_token):
+                        continue
+                    path = prepared_site_inputs.get(_canon_token(site))
+                    if not path:
+                        continue
+                    try:
+                        site_data = pd.read_csv(path)
+                    except EmptyDataError:
+                        logging.warning(
+                            "Skipping empty per-site cache file for %s / %s / %s: %s",
+                            region_token,
+                            site,
+                            target,
+                            path,
+                        )
+                        continue
+                    site_data["DateTime"] = pd.to_datetime(site_data["DateTime"], errors="coerce")
+                    site_data = _add_progressive_derived_features(
+                        site_data,
+                        site,
+                        target,
+                        choice["features"],
+                        progressive_neighbor_inputs or prepared_site_inputs,
+                    )
+                    site_data["Site"] = site
+                    site_data["Region"] = region_token.replace("_", " ")
+                    site_parts.append(site_data)
+                if site_parts:
+                    regional_data = pd.concat(site_parts, ignore_index=True)
+                    _write_air_quality_qc_report(regional_data, RESULTS_ROOT)
+                    if choice.get("feature_source") in {"generic_fallback", "stage3_borrowed"}:
+                        minimum_observations = int(
+                            getattr(config, "REGIONAL_GENERIC_MIN_FEATURE_OBSERVATIONS", 50)
+                        )
+                        usable_features = []
+                        coverage = {}
+                        for feature in choice["features"]:
+                            if feature not in regional_data.columns:
+                                continue
+                            observed_values = int(
+                                pd.to_numeric(regional_data[feature], errors="coerce").notna().sum()
+                            )
+                            coverage[feature] = observed_values
+                            if observed_values >= minimum_observations:
+                                usable_features.append(feature)
+                        choice["features"] = usable_features
+                        if not usable_features:
+                            logging.warning(
+                                "Regional fallback for %s / %s has no usable borrowed/generic features; skipping regional model",
+                                region_token,
+                                target,
+                            )
+                            continue
+                        logging.info(
+                            "Regional fallback feature coverage for %s / %s: %s",
+                            region_token,
+                            target,
+                            coverage,
+                        )
+                    regional_datasets[(region_token, target)] = (regional_data, choice)
 
         if not regional_datasets:
             raise RuntimeError("No regional pooled datasets could be constructed")
 
+        requested_target_workers = (
+            args.target_workers
+            if args.target_workers is not None
+            else getattr(config, "TARGET_PARALLEL_WORKERS", 1)
+        )
+        requested_model_n_jobs = (
+            args.model_n_jobs
+            if args.model_n_jobs is not None
+            else getattr(config, "MODEL_N_JOBS", 0)
+        )
+        target_workers, model_n_jobs = _resolve_target_parallelism(
+            target_count=len({target for _, target in regional_datasets}),
+            task_count=len(regional_datasets),
+            requested_workers=requested_target_workers,
+            requested_model_n_jobs=requested_model_n_jobs,
+            available_cpus=_allocated_cpu_count(),
+        )
+        config.MODEL_N_JOBS = model_n_jobs
+        config.USE_SPATIAL_FEATURES = False
+        config.USE_TEMPORAL_FEATURES = False
+        config.STRICT_PROGRESSIVE_FEATURE_LIST = False
+        logging.info(
+            "Regional target parallelism: workers=%d, model threads/worker=%d, tasks=%d",
+            target_workers,
+            model_n_jobs,
+            len(regional_datasets),
+        )
+
         regional_metric_frames = []
         regional_prediction_frames = []
+
+        def record_regional_result(regional_result):
+            """Publish one completed worker result from the main thread."""
+            task_metrics = regional_result.get("metrics") if regional_result else None
+            if task_metrics is not None and not task_metrics.empty:
+                os.makedirs(CENTRAL_METRICS_ROOT, exist_ok=True)
+                _upsert_aquistil_ablation_metrics(task_metrics, CENTRAL_METRICS_ROOT)
+                standard_metrics = _without_aquistil_ablations(task_metrics)
+                task_metrics = standard_metrics
+                if not task_metrics.empty:
+                    regional_metric_frames.append(task_metrics)
+                    _upsert_regional_metrics_by_target(task_metrics, CENTRAL_METRICS_ROOT)
+            if task_metrics is not None and not task_metrics.empty:
+                regional_metrics_path = os.path.join(
+                    CENTRAL_METRICS_ROOT, "regional_pooled_metrics.csv"
+                )
+                with _exclusive_file_lock(regional_metrics_path + ".lock"):
+                    regional_metrics = aggregate_metrics.upsert_regional_metrics(
+                        regional_metrics_path,
+                        task_metrics,
+                    )
+                    regional_metrics = _without_aquistil_ablations(regional_metrics)
+                    regional_metrics.to_csv(regional_metrics_path, index=False)
+                    _write_regional_metrics_by_target(regional_metrics, CENTRAL_METRICS_ROOT)
+                    logging.info(
+                        "Incrementally saved central regional metrics: %s "
+                        "(%d current rows, %d total rows)",
+                        regional_metrics_path,
+                        len(task_metrics),
+                        len(regional_metrics),
+                    )
+                    comparison_path = os.path.join(
+                        CENTRAL_METRICS_ROOT, "models_to_run_comparison.csv"
+                    )
+                    try:
+                        comparison = aggregate_metrics.write_models_comparison(
+                            regional_metrics,
+                            comparison_path,
+                            _normal_comparison_models(),
+                        )
+                        logging.info(
+                            "Incrementally saved MODELS_TO_RUN comparison: %s (%d matched rows)",
+                            comparison_path,
+                            len(comparison),
+                        )
+                    except ValueError as exc:
+                        logging.info(
+                            "Central regional metrics were saved; comparison will be completed "
+                            "after all requested models have metrics: %s",
+                            exc,
+                        )
+                    if _ablation_run_requested():
+                        try:
+                            _write_aquistil_ablation_comparison(
+                                regional_metrics, CENTRAL_METRICS_ROOT
+                            )
+                        except ValueError as exc:
+                            logging.info(
+                                "AQUISTIL ablation metrics were saved; paired comparison "
+                                "will be completed after all variants finish: %s",
+                                exc,
+                            )
+
+            task_predictions = regional_result.get("predictions") if regional_result else None
+            if task_predictions is not None and not task_predictions.empty:
+                regional_prediction_frames.append(task_predictions)
+                os.makedirs(CENTRAL_IMPUTED_ROOT, exist_ok=True)
+                regional_imputed_path = os.path.join(
+                    CENTRAL_IMPUTED_ROOT, "regional_pooled_imputed_results.csv"
+                )
+                with _exclusive_file_lock(regional_imputed_path + ".lock"):
+                    if os.path.exists(regional_imputed_path):
+                        previous_predictions = pd.read_csv(regional_imputed_path)
+                        current_predictions = pd.concat(
+                            [previous_predictions, task_predictions],
+                            ignore_index=True,
+                            sort=False,
+                        )
+                    else:
+                        current_predictions = task_predictions.copy()
+                    prediction_key = [
+                        column
+                        for column in [
+                            "DateTime",
+                            "Region",
+                            "Site",
+                            "Target",
+                            "Model",
+                            "Regime",
+                            "Missingness_Level",
+                            "Seed",
+                        ]
+                        if column in current_predictions.columns
+                    ]
+                    if prediction_key:
+                        current_predictions = current_predictions.drop_duplicates(
+                            prediction_key,
+                            keep="last",
+                        )
+                    current_predictions.to_csv(regional_imputed_path, index=False)
+                    logging.info(
+                        "Incrementally saved central regional imputed results: %s "
+                        "(%d current rows, %d total rows)",
+                        regional_imputed_path,
+                        len(task_predictions),
+                        len(current_predictions),
+                    )
+
+            for key, filename in (
+                ("diagnostics", "gap_mask_diagnostics.csv"),
+                ("exclusions", "site_target_exclusions.csv"),
+            ):
+                frame = regional_result.get(key) if regional_result else None
+                if frame is None or frame.empty:
+                    continue
+                os.makedirs(CENTRAL_METRICS_ROOT, exist_ok=True)
+                path = os.path.join(CENTRAL_METRICS_ROOT, filename)
+                with _exclusive_file_lock(path + ".lock"):
+                    if os.path.exists(path):
+                        previous = pd.read_csv(path)
+                        current = pd.concat([previous, frame], ignore_index=True, sort=False)
+                    else:
+                        current = frame.copy()
+                    dedupe_key = [
+                        column
+                        for column in [
+                            "Region",
+                            "Site",
+                            "Target",
+                            "Regime",
+                            "Seed",
+                            "Requested_Missingness",
+                        ]
+                        if column in current.columns
+                    ]
+                    if dedupe_key:
+                        current = current.drop_duplicates(dedupe_key, keep="last")
+                    current.to_csv(path, index=False)
+                logging.info("Incrementally saved central %s: %s (%d current rows)", key, path, len(frame))
+
+        ablation_resume_metrics = _load_aquistil_ablation_resume_metrics(
+            CENTRAL_METRICS_ROOT
+        )
+        if not ablation_resume_metrics.empty:
+            logging.info(
+                "Loaded %d persisted rows for resumable AQUISTIL ablation tasks",
+                len(ablation_resume_metrics),
+            )
+
         for model_name in available_models:
             model_module = load_model_module(model_name)
             if model_module is None:
@@ -1342,15 +2551,40 @@ def main():
                 continue
             impute_callable = _safe_imputer_wrapper(impute_callable)
             canonical_model = getattr(model_module, "MODEL_NAME", model_name)
-            for region_token, (regional_data, choice) in regional_datasets.items():
-                for target in config.TARGET_COLUMNS:
-                    if target not in regional_data.columns:
-                        logging.warning("Target %s unavailable for region %s", target, region_token)
-                        continue
-                    config.USE_SPATIAL_FEATURES = False
-                    config.USE_TEMPORAL_FEATURES = False
-                    config.STRICT_PROGRESSIVE_FEATURE_LIST = True
-                    regional_result = run_balanced_regional_task(
+
+            model_jobs = []
+            for (region_token, target), (regional_data, choice) in regional_datasets.items():
+                if target not in regional_data.columns:
+                    logging.warning("Target %s unavailable for region %s", target, region_token)
+                    continue
+                if _ablation_task_is_complete(
+                    ablation_resume_metrics,
+                    region_token,
+                    target,
+                    canonical_model,
+                ):
+                    logging.info(
+                        "Skipping complete ablation task: %s/%s/%s",
+                        region_token,
+                        target,
+                        canonical_model,
+                    )
+                    continue
+                model_jobs.append(
+                    (region_token, target, regional_data, choice)
+                )
+
+            if not model_jobs:
+                logging.info(
+                    "All requested regional tasks are already complete for %s",
+                    canonical_model,
+                )
+                continue
+
+            def run_regional_job(job):
+                region_token, target, regional_data, choice = job
+                with _target_logging_context(target):
+                    result = run_balanced_regional_task(
                         regional_data=regional_data,
                         region=region_token.replace("_", " "),
                         target=target,
@@ -1361,20 +2595,77 @@ def main():
                         missingness_levels=config.MISSINGNESS_LEVELS,
                         seeds=getattr(config, "REGIONAL_EVALUATION_SEEDS", [42]),
                         output_root=regional_output_root,
-                        plots_root=CENTRAL_PLOTS_ROOT if getattr(config, "SAVE_PLOTS", True) else None,
+                        plots_root=CENTRAL_PLOTS_ROOT if getattr(config, "SAVE_PLOTS", False) else None,
                         plot_types=getattr(config, "PLOT_TYPES", []),
                         plot_dpi=getattr(config, "PLOT_DPI", 300),
                         parameters={
                             "configuration": choice.get("configuration", ""),
                             "blocks": choice.get("blocks", ""),
+                            "feature_source": choice.get("feature_source", "stage3"),
                         },
+                        strict_feature_list=bool(
+                            choice.get("strict_progressive", False)
+                        ),
+                        model_n_jobs=model_n_jobs,
+                        handle_negatives=getattr(config, "HANDLE_NEGATIVES", "exclude"),
                     )
-                    task_metrics = regional_result.get("metrics") if regional_result else None
-                    if task_metrics is not None and not task_metrics.empty:
-                        regional_metric_frames.append(task_metrics)
-                    task_predictions = regional_result.get("predictions") if regional_result else None
-                    if task_predictions is not None and not task_predictions.empty:
-                        regional_prediction_frames.append(task_predictions)
+                return (region_token, target), result
+
+            model_workers = min(target_workers, max(1, len(model_jobs)))
+            if model_workers == 1:
+                for job in model_jobs:
+                    try:
+                        job_key, regional_result = run_regional_job(job)
+                    except Exception:
+                        with _target_logging_context(job[1]):
+                            logging.exception(
+                                "Regional task failed for %s/%s/%s",
+                                job[0],
+                                job[1],
+                                canonical_model,
+                            )
+                        continue
+                    with _target_logging_context(job_key[1]):
+                        logging.info(
+                            "Collecting completed regional result: %s/%s/%s",
+                            job_key[0],
+                            job_key[1],
+                            canonical_model,
+                        )
+                        record_regional_result(regional_result)
+            else:
+                logging.info(
+                    "Running %d regional %s tasks with %d target workers",
+                    len(model_jobs),
+                    canonical_model,
+                    model_workers,
+                )
+                with ThreadPoolExecutor(max_workers=model_workers) as executor:
+                    future_jobs = {
+                        executor.submit(run_regional_job, job): job
+                        for job in model_jobs
+                    }
+                    for future in as_completed(future_jobs):
+                        job = future_jobs[future]
+                        try:
+                            job_key, regional_result = future.result()
+                        except Exception:
+                            with _target_logging_context(job[1]):
+                                logging.exception(
+                                    "Regional task failed for %s/%s/%s",
+                                    job[0],
+                                    job[1],
+                                    canonical_model,
+                                )
+                            continue
+                        with _target_logging_context(job_key[1]):
+                            logging.info(
+                                "Collecting completed regional result: %s/%s/%s",
+                                job_key[0],
+                                job_key[1],
+                                canonical_model,
+                            )
+                            record_regional_result(regional_result)
 
         # Regional mode returns before the standard per-site aggregation below,
         # so explicitly publish its metrics to the central Metrics directory.
@@ -1383,31 +2674,71 @@ def main():
             CENTRAL_METRICS_ROOT, "regional_pooled_metrics.csv"
         )
         if regional_metric_frames:
-            regional_metrics = pd.concat(regional_metric_frames, ignore_index=True)
-            regional_metrics.to_csv(regional_metrics_path, index=False)
-            logging.info("Saved central regional metrics: %s", regional_metrics_path)
-            comparison_path = os.path.join(
-                CENTRAL_METRICS_ROOT, "models_to_run_comparison.csv"
+            current_regional_metrics = pd.concat(regional_metric_frames, ignore_index=True)
+            _upsert_aquistil_ablation_metrics(
+                current_regional_metrics, CENTRAL_METRICS_ROOT
             )
-            try:
-                comparison = aggregate_metrics.write_models_comparison(
-                    regional_metrics,
-                    comparison_path,
-                    getattr(config, "COMPARISON_MODELS", config.MODELS_TO_RUN),
+            _upsert_regional_metrics_by_target(current_regional_metrics, CENTRAL_METRICS_ROOT)
+            with _exclusive_file_lock(regional_metrics_path + ".lock"):
+                regional_metrics = aggregate_metrics.upsert_regional_metrics(
+                    regional_metrics_path,
+                    current_regional_metrics,
                 )
+                regional_metrics = _without_aquistil_ablations(regional_metrics)
+                regional_metrics.to_csv(regional_metrics_path, index=False)
+                _write_regional_metrics_by_target(regional_metrics, CENTRAL_METRICS_ROOT)
                 logging.info(
-                    "Saved MODELS_TO_RUN comparison: %s (%d matched rows)",
-                    comparison_path,
-                    len(comparison),
+                    "Upserted central regional metrics: %s "
+                    "(%d current rows, %d total rows)",
+                    regional_metrics_path,
+                    len(current_regional_metrics),
+                    len(regional_metrics),
+                )
+                comparison_path = os.path.join(
+                    CENTRAL_METRICS_ROOT, "models_to_run_comparison.csv"
+                )
+                try:
+                    comparison = aggregate_metrics.write_models_comparison(
+                        regional_metrics,
+                        comparison_path,
+                        _normal_comparison_models(),
+                    )
+                    logging.info(
+                        "Saved MODELS_TO_RUN comparison: %s (%d matched rows)",
+                        comparison_path,
+                        len(comparison),
+                    )
+                except ValueError as exc:
+                    logging.error(
+                        "Regional metrics were saved, but the model comparison "
+                        "could not be created: %s",
+                        exc,
+                    )
+                if _ablation_run_requested():
+                    try:
+                        _finalize_aquistil_ablation_outputs(
+                            CENTRAL_METRICS_ROOT, RESULTS_ROOT
+                        )
+                    except ValueError as exc:
+                        logging.error(
+                            "Ablation metrics were saved, but the paired ablation "
+                            "comparison could not be created: %s",
+                            exc,
+                        )
+        else:
+            logging.warning("No regional pooled metrics were produced; central metrics CSV not written")
+
+        if _ablation_run_requested():
+            try:
+                _finalize_aquistil_ablation_outputs(
+                    CENTRAL_METRICS_ROOT, RESULTS_ROOT
                 )
             except ValueError as exc:
                 logging.error(
-                    "Regional metrics were saved, but the model comparison "
-                    "could not be created: %s",
+                    "AQUISTIL ablation run remains incomplete; raw completed rows "
+                    "were preserved but final summaries were not replaced: %s",
                     exc,
                 )
-        else:
-            logging.warning("No regional pooled metrics were produced; central metrics CSV not written")
 
         # Publish all artificially masked observations and their imputed values
         # in one central file for downstream analysis.
@@ -1416,10 +2747,36 @@ def main():
             CENTRAL_IMPUTED_ROOT, "regional_pooled_imputed_results.csv"
         )
         if regional_prediction_frames:
-            pd.concat(regional_prediction_frames, ignore_index=True).to_csv(
-                regional_imputed_path, index=False
-            )
-            logging.info("Saved central regional imputed results: %s", regional_imputed_path)
+            current_predictions = pd.concat(regional_prediction_frames, ignore_index=True)
+            with _exclusive_file_lock(regional_imputed_path + ".lock"):
+                if os.path.exists(regional_imputed_path):
+                    previous_predictions = pd.read_csv(regional_imputed_path)
+                    current_predictions = pd.concat(
+                        [previous_predictions, current_predictions],
+                        ignore_index=True,
+                        sort=False,
+                    )
+                prediction_key = [
+                    column
+                    for column in [
+                        "DateTime",
+                        "Region",
+                        "Site",
+                        "Target",
+                        "Model",
+                        "Regime",
+                        "Missingness_Level",
+                        "Seed",
+                    ]
+                    if column in current_predictions.columns
+                ]
+                if prediction_key:
+                    current_predictions = current_predictions.drop_duplicates(
+                        prediction_key,
+                        keep="last",
+                    )
+                current_predictions.to_csv(regional_imputed_path, index=False)
+                logging.info("Saved central regional imputed results: %s", regional_imputed_path)
         else:
             logging.warning(
                 "No regional pooled predictions were produced; central imputed CSV not written"
@@ -1681,10 +3038,15 @@ def main():
                             model_name=f"{MODEL_NAME}_{site}",
                             sort_by_hour=config.SORT_BY_HOUR,
                             missingness_regime=regime,
+                            evaluation_seed=getattr(config, "GLOBAL_RANDOM_SEED", 42),
                             # Central paths from main.py
                             central_imputed_root=CENTRAL_IMPUTED_ROOT,
                             central_metrics_root=CENTRAL_METRICS_ROOT,
-                            central_plots_root=CENTRAL_PLOTS_ROOT,
+                            central_plots_root=(
+                                CENTRAL_PLOTS_ROOT
+                                if getattr(config, "SAVE_PLOTS", False)
+                                else None
+                            ),
                             results_root=RESULTS_ROOT,
                         )
                         
@@ -1741,6 +3103,9 @@ def main():
             traceback.print_exc()
 
     try_generate = args.generate_research or getattr(config, "AUTO_GENERATE_RESEARCH_PLOTS", False)
+    if try_generate and not getattr(config, "SAVE_PLOTS", False):
+        logging.info("Skipping research plot generation because SAVE_PLOTS is False.")
+        try_generate = False
     if try_generate:
         logging.info("Preparing to generate research-grade plots...")
         plot_out = RESEARCH_PLOTS_DIR
@@ -1749,22 +3114,17 @@ def main():
         except Exception:
             logging.warning(f"Could not create plot output directory: {plot_out}")
 
-        # Ensure aggregated CSV exists (best-effort): run aggregator if needed
+        # Refresh the aggregate before plotting so a one-model follow-up run
+        # contributes its rows instead of reusing a stale all_results_summary.csv.
         try:
-            agg_fp = os.path.join(RESULTS_ROOT, 'all_results_summary.csv')
-            if not os.path.exists(agg_fp):
-                logging.info("Aggregated summary not found; attempting to run aggregation...")
-                try:
-                    aggregate_metrics.aggregate(RESULTS_ROOT)
-                    logging.info("✅ Aggregation completed for research plots.")
-                except Exception:
-                    logging.warning(
-                        "Aggregation for research plots failed; proceeding to attempt plotting from raw metrics."
-                    )
+            logging.info("Refreshing aggregated summary for research plots...")
+            aggregate_metrics.aggregate(RESULTS_ROOT)
+            logging.info("✅ Aggregation completed for research plots.")
         except Exception:
-            logging.debug(
-                "Could not verify aggregated summary presence; continuing to plotting step."
+            logging.warning(
+                "Aggregation for research plots failed; proceeding to attempt plotting from available metrics."
             )
+            traceback.print_exc()
 
         try:
             logging.info("Generating research-grade plots...")

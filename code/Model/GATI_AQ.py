@@ -1,270 +1,283 @@
-import numpy as np
-import pandas as pd
+"""Leakage-safe gated specialist imputer for air-quality time series.
+
+The gate is trained on individually scored artificial gaps. Candidate models
+are run once per batch of equal-length gaps, while every gap receives its own
+winner label. Gate features are rebuilt after masking and summarized per gap,
+matching the way the gate is used for genuine missing segments.
+"""
+
 import logging
 
-# Gate model
 import lightgbm as lgb
+import numpy as np
+import pandas as pd
 
-# Candidate imputers (already in your pipeline)
-from Model.MissForest import impute_mice as mf_impute
-from Model.XGBoost import impute_mice as xgb_impute
-from Model.LightGBM import impute_mice as lgb_impute
+from Model.AQUISTIL import impute_mice as aquistil_impute
+from Model.AQUISTIL_A import impute_mice as aquistil_a_impute
+from Model.MICE import impute_mice as mice_impute
+from Model.MICE_AQUISTIL import impute_mice as mice_aquistil_impute
+
 
 MODEL_NAME = "GATI_AQ"
+FALLBACK_ID = 3
+IMPUTERS = {
+    0: ("MICE", mice_impute),
+    1: ("AQUISTIL_A", aquistil_a_impute),
+    2: ("AQUISTIL", aquistil_impute),
+    3: ("MICE_AQUISTIL", mice_aquistil_impute),
+}
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-# ---------------------------------------------------------------------
-# Candidate imputers (already in your pipeline)
-# ---------------------------------------------------------------------
-IMPUTERS = {
-    0: ("MissForest", mf_impute),
-    1: ("XGBoost", xgb_impute),
-    2: ("LightGBM", lgb_impute),
-}
+
+def _missing_segments(mask):
+    """Return positional arrays for every contiguous True segment."""
+    mask = np.asarray(mask, dtype=bool)
+    starts = np.flatnonzero(mask & ~np.r_[False, mask[:-1]])
+    ends = np.flatnonzero(mask & ~np.r_[mask[1:], False])
+    return [np.arange(start, end + 1) for start, end in zip(starts, ends)]
 
 
-# ---------------------------------------------------------------------
-# Temporal block masking (NO leakage)
-# ---------------------------------------------------------------------
-def temporal_block_mask(df, target, block_len, seed=42, n_blocks=20):
-    """
-    Create a boolean mask of positions to hide in contiguous temporal blocks.
-    Only masks positions where target is originally observed (not NaN).
-    """
+def _complete_gap_geometry(mask):
+    """Return complete gap length and one-based position for missing rows."""
+    mask = np.asarray(mask, dtype=bool)
+    lengths = np.zeros(mask.size, dtype=int)
+    positions = np.zeros(mask.size, dtype=int)
+    for segment in _missing_segments(mask):
+        lengths[segment] = len(segment)
+        positions[segment] = np.arange(1, len(segment) + 1)
+    return lengths, positions
+
+
+def _validation_blocks(df, target, block_len, n_blocks, seed):
+    """Select non-overlapping, fully observed contiguous validation blocks."""
+    observed = pd.to_numeric(df[target], errors="coerce").notna().to_numpy()
+    if block_len < 1 or observed.size < block_len:
+        return []
+    candidates = [
+        start for start in range(observed.size - block_len + 1)
+        if observed[start : start + block_len].all()
+    ]
     rng = np.random.default_rng(seed)
-    mask = np.zeros(len(df), dtype=bool)
-
-    valid = np.where(df[target].notna().values)[0]
-    if len(valid) < block_len:
-        return mask
-
-    max_start = max(1, len(df) - block_len - 1)
-    starts = rng.integers(0, max_start, size=n_blocks)
-
-    for s in starts:
-        block = np.arange(s, s + block_len)
-        # Only mask originally non-missing target points
-        block = block[df[target].iloc[block].notna().values]
-        mask[block] = True
-
-    return mask
+    rng.shuffle(candidates)
+    selected = []
+    occupied = np.zeros(observed.size, dtype=bool)
+    for start in candidates:
+        segment = np.arange(start, start + block_len)
+        if occupied[segment].any():
+            continue
+        selected.append(segment)
+        occupied[segment] = True
+        if len(selected) >= n_blocks:
+            break
+    return sorted(selected, key=lambda segment: int(segment[0]))
 
 
-# ---------------------------------------------------------------------
-# Gate features (cheap, available at runtime)
-# ---------------------------------------------------------------------
 def build_gate_features(df, target):
-    """
-    Build gate features that are:
-      - cheap (no heavy models)
-      - available at runtime
-      - informative about missingness regimes (gap length, season/time)
-    """
-    X = pd.DataFrame(index=df.index)
+    """Build features available after the target's missing mask is known.
 
-    # Time features
-    dt = pd.to_datetime(df["DateTime"])
-    X["hour"] = dt.dt.hour.astype(int)
-    X["month"] = dt.dt.month.astype(int)
-    X["dow"] = dt.dt.dayofweek.astype(int)
+    Target context excludes the current row. Both past and future observed
+    context may be used because this pipeline performs offline imputation.
+    """
+    if "DateTime" not in df.columns:
+        raise ValueError("GATI_AQ requires a 'DateTime' column")
 
-    # Target-based rolling stats (use only past context; ffill/bfill is ok for gating, no label leakage)
     y = pd.to_numeric(df[target], errors="coerce")
+    missing = y.isna().to_numpy()
+    lengths, positions = _complete_gap_geometry(missing)
+    dt = pd.to_datetime(df["DateTime"], errors="coerce")
+    features = pd.DataFrame(index=df.index)
+    features["hour_sin"] = np.sin(2 * np.pi * dt.dt.hour / 24)
+    features["hour_cos"] = np.cos(2 * np.pi * dt.dt.hour / 24)
+    features["dow_sin"] = np.sin(2 * np.pi * dt.dt.dayofweek / 7)
+    features["dow_cos"] = np.cos(2 * np.pi * dt.dt.dayofweek / 7)
+    features["month_sin"] = np.sin(2 * np.pi * dt.dt.month / 12)
+    features["month_cos"] = np.cos(2 * np.pi * dt.dt.month / 12)
+    features["gap_length"] = lengths
+    features["gap_position_fraction"] = np.divide(
+        positions, lengths, out=np.zeros_like(lengths, dtype=float), where=lengths > 0
+    )
 
-    X["roll_mean_24"] = y.rolling(24, min_periods=6).mean()
-    X["roll_std_24"] = y.rolling(24, min_periods=6).std()
-    X["roll_mean_72"] = y.rolling(72, min_periods=12).mean()
-    X["roll_std_72"] = y.rolling(72, min_periods=12).std()
+    # All rolling windows are shifted so the row's true target can never enter
+    # its own gate features. Reversing supplies the equivalent future context.
+    past = y.shift(1)
+    future = y.shift(-1).iloc[::-1]
+    for window, minimum in ((6, 2), (24, 4), (72, 8)):
+        features[f"past_mean_{window}"] = past.rolling(window, min_periods=minimum).mean()
+        features[f"past_std_{window}"] = past.rolling(window, min_periods=minimum).std()
+        features[f"future_mean_{window}"] = (
+            future.rolling(window, min_periods=minimum).mean().iloc[::-1]
+        )
+        features[f"future_std_{window}"] = (
+            future.rolling(window, min_periods=minimum).std().iloc[::-1]
+        )
 
-    # Gap-aware features (CRITICAL)
-    is_missing = y.isna().astype(int)
-
-    # consecutive missing run-length (counts within each missing segment)
-    # For non-missing points this will be 0
-    run_id = (is_missing == 0).cumsum()
-    X["gap_length"] = is_missing.groupby(run_id).cumcount()
-    X["is_missing"] = is_missing
-
-    # Simple regime flags
-    X["is_night"] = X["hour"].isin([0, 1, 2, 3, 4, 5]).astype(int)
-    X["is_winter"] = X["month"].isin([6, 7, 8]).astype(int)
-
-    # Fill
-    X = X.ffill().bfill().fillna(0.0)
-
-    # Ensure numeric
-    for c in X.columns:
-        X[c] = pd.to_numeric(X[c], errors="coerce").fillna(0.0)
-
-    return X
+    observed = y.notna().to_numpy()
+    index = np.arange(len(df))
+    previous = pd.Series(np.where(observed, index, np.nan)).ffill().to_numpy()
+    following = pd.Series(np.where(observed, index, np.nan)).bfill().to_numpy()
+    features["distance_previous"] = index - previous
+    features["distance_next"] = following - index
+    features["previous_value"] = y.ffill()
+    features["next_value"] = y.bfill()
+    features["context_slope"] = (
+        features["next_value"] - features["previous_value"]
+    ) / (features["distance_previous"] + features["distance_next"]).replace(0, np.nan)
+    return features.replace([np.inf, -np.inf], np.nan).fillna(0.0).astype(float)
 
 
-# ---------------------------------------------------------------------
-# MAIN ENTRY POINT (called by main.py)
-# ---------------------------------------------------------------------
-def impute_mice(
-    data,
-    target_column,
-    input_columns,
-    custom_strategies=None,
-    **kwargs
+def _segment_record(features, segment):
+    """Summarize one gap into one gate-training or prediction record."""
+    block = features.iloc[segment]
+    record = block.mean(axis=0)
+    record["gap_start_hour_sin"] = block["hour_sin"].iloc[0]
+    record["gap_start_hour_cos"] = block["hour_cos"].iloc[0]
+    return record
+
+
+def _run_candidate(fn, frame, target, input_columns, custom_strategies, kwargs):
+    return fn(
+        frame.copy(), target, input_columns,
+        custom_strategies=custom_strategies, **kwargs
+    )
+
+
+def _training_cases(
+    df, target, input_columns, block_sizes, blocks_per_size,
+    custom_strategies, kwargs, random_state,
 ):
-    """
-    GATI-AQ: Gated Adaptive Temporal-spatial Imputation for Air Quality
+    """Create independently scored, leakage-safe block-level gate cases."""
+    records, labels, errors = [], [], []
+    for size_index, block_len in enumerate(block_sizes):
+        blocks = _validation_blocks(
+            df, target, int(block_len), int(blocks_per_size),
+            random_state + size_index * 1009,
+        )
+        if not blocks:
+            continue
+        combined = np.concatenate(blocks)
+        masked = df.copy()
+        truth = pd.to_numeric(df[target], errors="coerce")
+        masked.iloc[combined, masked.columns.get_loc(target)] = np.nan
+        gate_features = build_gate_features(masked, target)
 
-    Key fixes vs your previous version:
-      ✅ Gate supervision is BLOCK-LEVEL winner (stable regimes, not point noise)
-      ✅ Gate has GAP-AWARE features (missingness geometry)
-      ✅ Optional confidence fallback to LightGBM (safer deployment)
-    """
-    logging.info("🚀 GATI-AQ started")
+        predictions = {}
+        for model_id, (name, fn) in IMPUTERS.items():
+            try:
+                output = _run_candidate(
+                    fn, masked, target, input_columns, custom_strategies, kwargs
+                )
+                predictions[model_id] = pd.to_numeric(output[target], errors="coerce")
+            except Exception as exc:
+                logging.warning("[%s] validation candidate %s failed: %s", MODEL_NAME, name, exc)
+                predictions[model_id] = pd.Series(np.nan, index=df.index)
 
+        for segment in blocks:
+            model_errors = {}
+            actual = truth.iloc[segment].to_numpy(dtype=float)
+            for model_id, prediction in predictions.items():
+                predicted = prediction.iloc[segment].to_numpy(dtype=float)
+                valid = np.isfinite(actual) & np.isfinite(predicted)
+                model_errors[model_id] = (
+                    float(np.sqrt(np.mean((actual[valid] - predicted[valid]) ** 2)))
+                    if valid.any() else np.inf
+                )
+            winner = min(model_errors, key=model_errors.get)
+            if not np.isfinite(model_errors[winner]):
+                continue
+            records.append(_segment_record(gate_features, segment))
+            labels.append(winner)
+            errors.append(model_errors)
+    return records, np.asarray(labels, dtype=int), errors
+
+
+def impute_mice(
+    data, target_column, input_columns, custom_strategies=None, **kwargs
+):
+    """Impute each genuine gap with the gate-selected specialist."""
     df = data.copy()
     target = target_column
-
-    import config_spatial as config
-    if getattr(config, "STRICT_PROGRESSIVE_FEATURE_LIST", False):
-        logging.info(
-            "Strict Stage 3 feature contract active; bypassing GATI gate/context "
-            "features and using the exact-list LightGBM path."
-        )
-        return lgb_impute(df, target, input_columns, **kwargs)
-
-    # Safety checks
     if "DateTime" not in df.columns:
-        raise ValueError("GATI_AQ requires a 'DateTime' column for gate features.")
+        raise ValueError("GATI_AQ requires a 'DateTime' column")
+    missing = pd.to_numeric(df[target], errors="coerce").isna().to_numpy()
+    if not missing.any() or not (~missing).any():
+        return df if not missing.any() else _run_candidate(
+            mice_aquistil_impute, df, target, input_columns, custom_strategies, kwargs
+        )
 
-    # If target completely missing -> fallback directly (nothing to learn)
-    if df[target].notna().sum() == 0:
-        logging.warning("⚠️ Target is completely missing. Fallback → LightGBM imputer.")
-        return lgb_impute(df, target, input_columns)
-
-    # ---------------------------------------------------------
-    # 1) BENCHMARK UNDER REALISTIC MASKING (BLOCK-LEVEL WINNER)
-    # ---------------------------------------------------------
-    X_gate_parts = []
-    y_gate_parts = []
-
-    gate_features_full = build_gate_features(df, target)
-
-    # Multiple block sizes to learn regimes
-    block_sizes = [6, 12, 24, 72]
-    seed_base = 42
-
-    for b_i, block in enumerate(block_sizes):
-        mask = temporal_block_mask(df, target, block_len=block, seed=seed_base + b_i, n_blocks=20)
-        if mask.sum() == 0:
-            continue
-
-        df_masked = df.copy()
-        y_true = pd.to_numeric(df.loc[mask, target], errors="coerce").values
-        df_masked.loc[mask, target] = np.nan
-
-        preds = {}
-        for mid, (_, fn) in IMPUTERS.items():
-            try:
-                out = fn(df_masked.copy(), target, input_columns)
-                preds[mid] = pd.to_numeric(out.loc[mask, target], errors="coerce").values
-            except Exception as e:
-                logging.warning(f"⚠️ Candidate imputer failed during benchmarking: {IMPUTERS[mid][0]}: {e}")
-                preds[mid] = np.full_like(y_true, np.nan, dtype=float)
-
-        # BLOCK-LEVEL winner: pick model with lowest block RMSE (stable target)
-        rmses = []
-        for mid in sorted(preds.keys()):
-            err = y_true - preds[mid]
-            rmse = np.sqrt(np.nanmean(err ** 2))
-            rmses.append(rmse)
-
-        if np.all(np.isnan(rmses)):
-            continue
-
-        winner_mid = int(np.nanargmin(rmses))
-
-        # Supervise all rows in the block with the same winner label
-        X_case = gate_features_full.loc[mask]
-        y_case = np.full(mask.sum(), winner_mid, dtype=int)
-
-        X_gate_parts.append(X_case)
-        y_gate_parts.append(y_case)
-
-        logging.info(f"🧪 Block={block}h winner={IMPUTERS[winner_mid][0]} RMSEs={dict(zip([IMPUTERS[k][0] for k in sorted(preds.keys())], rmses))}")
-
-    if len(X_gate_parts) == 0:
-        logging.warning("⚠️ No valid benchmarking blocks. Fallback → LightGBM")
-        return lgb_impute(df, target, input_columns)
-
-    X_gate = pd.concat(X_gate_parts, axis=0)
-    y_gate = np.concatenate(y_gate_parts, axis=0)
-
-    # ---------------------------------------------------------
-    # 2) TRAIN SURROGATE GATE
-    # ---------------------------------------------------------
-    gate = lgb.LGBMClassifier(
-        n_estimators=400,
-        learning_rate=0.05,
-        num_leaves=31,
-        subsample=0.9,
-        colsample_bytree=0.9,
-        random_state=42,
+    random_state = int(kwargs.get("random_state", 42))
+    block_sizes = kwargs.pop("gati_block_sizes", (6, 12, 24, 72))
+    blocks_per_size = int(kwargs.pop("gati_blocks_per_size", 8))
+    confidence_threshold = float(kwargs.pop("gati_confidence_threshold", 0.60))
+    records, labels, validation_errors = _training_cases(
+        df, target, input_columns, block_sizes, blocks_per_size,
+        custom_strategies, kwargs, random_state,
     )
-    gate.fit(X_gate, y_gate)
-    logging.info("✅ GATI surrogate trained")
+    if not records:
+        logging.warning("[%s] no valid gate cases; using MICE_AQUISTIL", MODEL_NAME)
+        return _run_candidate(
+            mice_aquistil_impute, df, target, input_columns, custom_strategies, kwargs
+        )
 
-    # ---------------------------------------------------------
-    # 3) GATED IMPUTATION (PRODUCTION MODE)
-    # ---------------------------------------------------------
-    missing_mask = df[target].isna().values
-    n_missing = int(missing_mask.sum())
-    if n_missing == 0:
-        logging.info("✅ No missing values found in target. Returning original df.")
-        return df
+    X_train = pd.DataFrame(records).fillna(0.0)
+    mean_error = {
+        model_id: float(np.mean([case[model_id] for case in validation_errors]))
+        for model_id in IMPUTERS
+    }
+    global_best = min(mean_error, key=mean_error.get)
+    classes = np.unique(labels)
+    gate = None
+    if classes.size > 1:
+        gate = lgb.LGBMClassifier(
+            n_estimators=200, learning_rate=0.04, num_leaves=15,
+            min_child_samples=5, reg_lambda=1.0, random_state=random_state,
+            n_jobs=-1, verbosity=-1,
+        )
+        gate.fit(X_train, labels)
 
-    X_pred = build_gate_features(df, target).loc[missing_mask]
+    features = build_gate_features(df, target)
+    segments = _missing_segments(missing)
+    X_predict = pd.DataFrame(
+        [_segment_record(features, segment) for segment in segments]
+    ).reindex(columns=X_train.columns, fill_value=0.0)
+    if gate is None:
+        choices = np.full(len(segments), global_best, dtype=int)
+        confidence = np.ones(len(segments), dtype=float)
+    else:
+        probabilities = gate.predict_proba(X_predict)
+        positions = np.argmax(probabilities, axis=1)
+        choices = gate.classes_[positions].astype(int)
+        confidence = probabilities[np.arange(len(segments)), positions]
+        choices[confidence < confidence_threshold] = FALLBACK_ID
 
-    # Predict probabilities for confidence-aware fallback
-    proba = gate.predict_proba(X_pred)
-    chosen_models = np.argmax(proba, axis=1).astype(int)
-    confidence = np.max(proba, axis=1)
+    required = set(int(choice) for choice in choices)
+    outputs = {}
+    for model_id in required:
+        outputs[model_id] = _run_candidate(
+            IMPUTERS[model_id][1], df, target, input_columns,
+            custom_strategies, kwargs,
+        )
+    result = df.copy()
+    fallback_output = None
+    usage = {}
+    for segment, model_id in zip(segments, choices):
+        name = IMPUTERS[int(model_id)][0]
+        usage[name] = usage.get(name, 0) + 1
+        values = pd.to_numeric(outputs[int(model_id)][target], errors="coerce").iloc[segment]
+        if values.isna().any():
+            if fallback_output is None:
+                fallback_output = _run_candidate(
+                    mice_aquistil_impute, df, target, input_columns,
+                    custom_strategies, kwargs,
+                )
+            values = values.fillna(pd.to_numeric(fallback_output[target], errors="coerce").iloc[segment])
+        result.iloc[segment, result.columns.get_loc(target)] = values.to_numpy()
 
-    # Confidence safeguard: if gate is uncertain, fallback to LightGBM (id=2)
-    # You can tune this threshold; 0.55–0.65 is typical.
-    CONF_THRESH = 0.60
-    fallback_id = 2  # LightGBM
-    chosen_models_safe = chosen_models.copy()
-    chosen_models_safe[confidence < CONF_THRESH] = fallback_id
-
-    # Run only required models
-    model_outputs = {}
-    for mid in np.unique(chosen_models_safe):
-        _, fn = IMPUTERS[int(mid)]
-        model_outputs[int(mid)] = fn(df.copy(), target, input_columns)
-
-    # Assign imputed values (robust indexing)
-    miss_idx = np.where(missing_mask)[0]
-    final_vals = np.empty(n_missing, dtype=float)
-
-    for k, row_idx in enumerate(miss_idx):
-        mid = int(chosen_models_safe[k])
-        out_df = model_outputs[mid]
-        final_vals[k] = pd.to_numeric(out_df.iloc[row_idx][target], errors="coerce")
-
-    # If any NaNs still exist (rare), final fallback to LightGBM output
-    if np.isnan(final_vals).any():
-        logging.warning("⚠️ Some gated outputs are NaN. Filling remaining with LightGBM.")
-        if fallback_id not in model_outputs:
-            model_outputs[fallback_id] = lgb_impute(df.copy(), target, input_columns)
-        lgb_vals = pd.to_numeric(model_outputs[fallback_id].loc[missing_mask, target], errors="coerce").values
-        final_vals = np.where(np.isnan(final_vals), lgb_vals, final_vals)
-
-    df.loc[missing_mask, target] = final_vals
-
-    # Logging usage summary
-    uniq, counts = np.unique(chosen_models_safe, return_counts=True)
-    usage = {IMPUTERS[int(u)][0]: int(c) for u, c in zip(uniq, counts)}
-    logging.info(f"🎯 GATI usage (after confidence fallback): {usage}")
-    logging.info(f"🧠 Mean gate confidence: {float(np.mean(confidence)):.3f}, below-thresh: {int((confidence < CONF_THRESH).sum())}/{n_missing}")
-    logging.info("🏁 GATI-AQ completed")
-
-    return df
+    # Preserve all originally observed target values exactly.
+    result.loc[~missing, target] = df.loc[~missing, target]
+    logging.info(
+        "[%s] cases=%d classes=%s global_best=%s usage=%s mean_confidence=%.3f",
+        MODEL_NAME, len(labels), classes.tolist(), IMPUTERS[global_best][0], usage,
+        float(np.mean(confidence)),
+    )
+    return result

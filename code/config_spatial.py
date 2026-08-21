@@ -39,14 +39,71 @@ WIDE_API_INPUT_DIRECTORY = os.environ.get(
 # Optional: auto-download/append the missing tail "up to now" for the wide
 # regional inputs before running the imputation pipeline. This can be slow
 # depending on region size and API responsiveness.
-AUTO_UPDATE_WIDE_INPUTS = True
+# Offline by default for reproducible model evaluation. Pass
+# --refresh-api-inputs explicitly when the wide inputs should be updated.
+AUTO_UPDATE_WIDE_INPUTS = False
 
 # Base output directory for results
 # main.py will build all other output trees (Model_output, Metrics, Imputed_Results, plots)
 # from this root; config only declares the base and subdir names.
+FROZEN_OUTPUT_DIRECTORY = (
+    "/mnt/scratch_lustre/ar_ai4ba_scratch/Ai4BetterAir/AQUISTIL/Outputs/Final_Frozen_2026_08_17"
+)
+DEVELOPMENT_ABLATION_OUTPUT_DIRECTORY = (
+    "/mnt/scratch_lustre/ar_ai4ba_scratch/Ai4BetterAir/AQUISTIL/Outputs/Imputation_Results"
+)
+EXPERIMENT_MODE = os.environ.get(
+    "AQUISTIL_EXPERIMENT_MODE", "frozen_validation"
+).strip().lower()
+if EXPERIMENT_MODE not in {"frozen_validation", "development_ablation"}:
+    raise ValueError(
+        "AQUISTIL_EXPERIMENT_MODE must be frozen_validation or development_ablation"
+    )
+DEFAULT_OUTPUT_DIRECTORY = (
+    DEVELOPMENT_ABLATION_OUTPUT_DIRECTORY
+    if EXPERIMENT_MODE == "development_ablation"
+    else FROZEN_OUTPUT_DIRECTORY
+)
 OUTPUT_DIRECTORY = os.environ.get(
     "AQUISTIL_IMPUTATION_OUTPUT_DIR",
-    "/mnt/scratch_lustre/ar_ai4ba_scratch/Ai4BetterAir/AQUISTIL/Outputs/Imputation_Result",
+    DEFAULT_OUTPUT_DIRECTORY,
+)
+
+# Publication validation protocol. The runtime rejects overrides that would mix
+# development regions into this held-out evaluation.
+FROZEN_RELEASE_TAG = "aquistil-frozen-heldout-2026-08-17-r4"
+FROZEN_VALIDATION_MODE = EXPERIMENT_MODE == "frozen_validation"
+FROZEN_STAGE3_FEATURE_FILES = {
+    "PM10": os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "frozen_inputs",
+        "aquistil_heldout_2026_08_14",
+        "stage3_PM10.csv",
+    ),
+    "PM2.5": os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "frozen_inputs",
+        "aquistil_heldout_2026_08_14",
+        "stage3_PM2.5.csv",
+    ),
+}
+DEVELOPMENT_ABLATION_STAGE3_FEATURE_FILES = {
+    "PM10": os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "frozen_inputs",
+        "aquistil_development_ablation_2026_08_16",
+        "stage3_PM10.csv",
+    ),
+    "PM2.5": os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "frozen_inputs",
+        "aquistil_development_ablation_2026_08_16",
+        "stage3_PM2.5.csv",
+    ),
+}
+AQUISTIL_ABLATION_METRICS_DIRECTORY = os.environ.get(
+    "AQUISTIL_ABLATION_METRICS_DIR",
+    os.path.join(DEVELOPMENT_ABLATION_OUTPUT_DIRECTORY, "Metrics copy"),
 )
 
 FINAL_RESULTS_SUBDIR = "FINAL_Results"
@@ -74,71 +131,250 @@ MAX_SPATIAL_DISTANCE = 50  # km
 
 # Models to run (list of module names)
 # ✅ These models will use the spatial/temporal features configured below
+PAPER_BASELINE_MODELS = ["LightGBM"]
+
 MODELS_TO_RUN = [
-    # Proposed model and paper baseline
+    # Robust regime-aware stack. The base experts are configured below and do
+    # not need to be listed separately unless they should also be benchmarked.
+    # "AQUISTIL_R",
+    # Proposed model
     "AQUISTIL",
-    "LightGBM",
+    # # "MICE_AQUISTIL",
+    # "MICE_PosteriorRefined",
+    # "Surrogate_AQUISTIL",
+    # "Surrogate_AQUISTIL_Selector",
+] + PAPER_BASELINE_MODELS
+
+# Diagnostic AQUISTIL ablations for contiguous-gap failure analysis. Keep this
+# disabled for the frozen AQUISTIL_Current/AQUISTIL/LightGBM comparison.
+RUN_AQUISTIL_ABLATIONS = EXPERIMENT_MODE == "development_ablation"
+AQUISTIL_ABLATION_MODELS = [
+    "AQUISTIL_NoHistory",
+    "AQUISTIL_NoHistoryNoEvent",
+    "AQUISTIL_NoFFill",
+    "AQUISTIL_NoAdaptive",
+    "AQUISTIL_ExogenousOnly",
+    "AQUISTIL_NoAQUISTILFeatures",
 ]
 
-# Models included in the compact wide comparison CSV. Keep this independent
-# from MODELS_TO_RUN so experimental models do not make the core comparison
-# incomplete when they are skipped or still running.
-COMPARISON_MODELS = [
-    "AQUISTIL", "LightGBM",
-]
+if RUN_AQUISTIL_ABLATIONS:
+    MODELS_TO_RUN = ["AQUISTIL"] + AQUISTIL_ABLATION_MODELS + PAPER_BASELINE_MODELS
 
-# AQUISTIL2 peak-event specialist. The expert is trained with progressively
-# larger weights above the 80th, 90th and 95th target percentiles. Its
-# feature-driven prediction can only lift the normal prediction, and the
-# contribution is capped to protect non-event performance.
-AQUISTIL2_EVENT_EXPERT_ENABLED = True
-AQUISTIL2_EVENT_MAX_BLEND = 0.65
+# Missingness-topology-aware AQUISTIL. The provisional 2-hour threshold keeps
+# isolated missing observations on the history expert and routes sustained
+# outages to the internal no-history gap expert. Freeze this only after testing
+# the global candidates below on development regions.
+AQUISTIL_REGIME_AWARE_ENABLED = True
+AQUISTIL_GAP_EXPERT_MIN_RUN_LENGTH = 2
+FROZEN_GAP_EXPERT_MIN_RUN_LENGTH = 2
+AQUISTIL_GAP_EXPERT_THRESHOLD_CANDIDATES = (2, 3, 6, 12, 24)
+AQUISTIL_GAP_BOUNDARY_FEATURES_ENABLED = False
+# Historical/batch imputation can use the observed boundary after a gap. Set
+# False for causal/real-time use; future-derived gap features then remain NaN.
+AQUISTIL_GAP_ALLOW_FUTURE_CONTEXT = True
+AQUISTIL_GAP_MASKED_TRAINING_ENABLED = False
+
+# AQUISTIL-R robust stacking controls. Three regime-matched validation folds
+# require 3 x len(BASE_MODELS) expert fits plus one final fit per expert. Reduce
+# VALIDATION_FOLDS to 1 for a quick smoke run; use 0 to run from the priors only.
+# AQUISTIL_R_BASE_MODELS = (
+#     "AQUISTIL",
+#     # "MICE_AQUISTIL",
+#     # "MICE-BR",
+#     # "AQUISTIL_A",
+#     # "LightGBM",
+# )
+AQUISTIL_R_VALIDATION_FOLDS = 3
+AQUISTIL_R_VALIDATION_FRACTION = 0.12
+AQUISTIL_R_MIN_VALIDATION_POINTS = 48
+AQUISTIL_R_MAX_VALIDATION_POINTS = 500
+AQUISTIL_R_MIN_TRAINING_POINTS = 50
+AQUISTIL_R_MIN_ROUTE_ROWS = 24
+AQUISTIL_R_MIN_EXPERT_COVERAGE = 0.80
+AQUISTIL_R_PRIOR_STRENGTH = 40.0
+AQUISTIL_R_REGULARIZATION = 0.03
+AQUISTIL_R_HUBER_DELTA = 1.5
+AQUISTIL_R_EVENT_QUANTILE = 0.90
+
+# When experts strongly disagree, blend toward their weighted median. Event
+# predictions use a smaller pull so a valid high-concentration expert survives.
+AQUISTIL_R_DISAGREEMENT_BLEND = 0.35
+AQUISTIL_R_EVENT_DISAGREEMENT_BLEND = 0.15
+AQUISTIL_R_DISAGREEMENT_START = 0.35
+AQUISTIL_R_DISAGREEMENT_FULL = 1.25
+
+# Conservative physical bounds are learned per site. Explicit bounds can be
+# supplied here when a target has known measurement limits.
+AQUISTIL_R_LOWER_QUANTILE = 0.001
+AQUISTIL_R_UPPER_QUANTILE = 0.999
+AQUISTIL_R_BOUND_IQR_FACTOR = 3.0
+AQUISTIL_R_LOWER_BOUND = None
+AQUISTIL_R_UPPER_BOUND = None
+AQUISTIL_R_ADD_DIAGNOSTICS = True
+
+# Active AQUISTIL event specialist. It is used for event experiments and real
+# (unlabelled) missingness only; synthetic random/gap experiments use the common
+# backbone so false event detections cannot dominate their point predictions.
+AQUISTIL_EVENT_REFINEMENT_ENABLED = True
+AQUISTIL_EVENT_REFINEMENT_REGIMES = ("event", "")
+AQUISTIL_EVENT_PERCENTILE = 0.90
+AQUISTIL_EVENT_PROBABILITY_THRESHOLD = 0.55
+AQUISTIL_EVENT_MAX_BLEND = 0.70
+AQUISTIL_EVENT_CAP_QUANTILE = 0.98
+
+# AQUISTIL adaptive gap guardrails. These rules only alter pollutant/regime
+# combinations where the pooled metrics showed weaker performance; all other
+# AQUISTIL predictions keep the normal LightGBM + event-refinement output.
+AQUISTIL_ADAPTIVE_GAP_GUARDRAILS_ENABLED = True
+AQUISTIL_ADAPTIVE_MIN_SPATIAL_CONTRIBUTORS = 2
+AQUISTIL_ADAPTIVE_BLEND_RULES = {
+    # PM10 long/medium gaps had large outliers, especially Sydney North-west.
+    # Pull those predictions toward the adaptive spatial/hourly reference.
+    "PM10": {
+        "medium_gap": 0.25,
+        "long_gap": 0.40,
+        "gap_medium": 0.25,
+        "gap_long": 0.40,
+        "gap_extreme": 0.50,
+    },
+    # PM2.5 medium/long gaps were weaker than BRITS/LightGBM. Use a softer
+    # spatial pull so random/event performance is preserved.
+    "PM2.5": {
+        "medium_gap": 0.20,
+        "long_gap": 0.30,
+        "gap_medium": 0.20,
+        "gap_long": 0.30,
+        "gap_extreme": 0.35,
+    },
+}
+AQUISTIL_ADAPTIVE_UNCERTAINTY_EXTRA_BLEND = {
+    "PM2.5": 0.10,
+}
+AQUISTIL_ADAPTIVE_UNCERTAINTY_QUANTILE = 0.75
+AQUISTIL_FINAL_CLIP_TARGETS = {"PM10": True}
+AQUISTIL_ADAPTIVE_LOWER_QUANTILE = 0.01
+AQUISTIL_ADAPTIVE_UPPER_QUANTILE = 0.995
+AQUISTIL_ADAPTIVE_IQR_FACTOR = 1.5
+AQUISTIL_ADAPTIVE_NONNEGATIVE = True
+
+# OZONE was strong for event/random/long gaps but weaker for short/medium gaps.
+# In those regimes, keep the event features but reduce the final event-expert
+# correction so the backbone prediction dominates.
+AQUISTIL_OZONE_SHORT_MEDIUM_EVENT_MAX_BLEND = 0.20
 
 # Additional candidate implementations.  ``main.py`` appends these to the
 # primary AQUISTIL/LightGBM pair above and evaluates every model with the same
 # data, artificial masks, missingness levels and seeds.  The compact paper
 # comparison remains controlled independently by ``COMPARISON_MODELS``.
 STANDALONE_MODELS = [
-    # LightGBM and enhanced tree candidates
-    "LGBMPlus",
-    "LGBMPlusSpatialIterOptimized",
-    "LGBM_AQ_Plus_Adaptive",
-    "LGBM_AQ_Plus_SpatialIter_Optimized_V2",
-    "RALGBM",
-    "XGBoost",
-
-    # Hybrid and ensemble candidates
-    "GATI_AQ",
-    # "HybridMFXGB_LGB_Pro",
-    "HybridMissForest_Advanced",
-    "HybridMissForest_Only",
-    "HybridMissForest_Probabilistic",
-    "HybridMissForest_XGB_Simple",
-    "SuperLearner",
-
-    # MICE and classical regression candidates
-    "MICE",
-    "MICE-BR",
-    "MICE-RF",
-    "MissForest",
-    "GaussianProcess",
-    "KNN",
-
-    # Matrix-completion and simple baselines
+    # "XGBoost",
+    # "MICE",
+    # "MICE-KNN",
+    # "MissForest",
+    # "KNN",
     # "Mean",
     # "Median",
     # "Mode",
     # "BaseLine",
     # "interpolation",
-    "OptSpace",
-    "SVT",
-    # "SoftImpute",
 ]
 
 # Extend the primary models list
 MODELS_TO_RUN += STANDALONE_MODELS
 
+# Include every selected primary and standalone model in the wide comparison
+# CSV. Keep the union explicit and de-duplicated so comparison output remains
+# complete even if list-extension logic changes.
+COMPARISON_MODELS = list(dict.fromkeys(MODELS_TO_RUN))
+
+# ============================================================================
+# MISSINGNESS EVALUATION
+# ============================================================================
+
+# Levels of artificial missingness in the frozen held-out evaluation.
+MISSINGNESS_LEVELS = [0.05, 0.10, 0.20, 0.30, 0.5, 0.6]
+
+# ============================================================================
+# MISSINGNESS REGIME
+# ============================================================================
+
+# Event-specialist model-selection run.  Restore the full list below for the
+# final all-regime evaluation after selecting the winning candidate:
+# ['random', 'short_gap', 'medium_gap', 'long_gap', 'event']
+MISSINGNESS_REGIMES = ['random', 'short_gap', 'medium_gap', 'long_gap', 'event']
+# MISSINGNESS_REGIMES = ['medium_gap', 'long_gap', 'event']
+
+# Default single regime (overridden by main.py when running all regimes)
+MISSINGNESS_REGIME = None
+
+# ---------------------------------------------------------------------------
+# REGION SCOPE
+# ---------------------------------------------------------------------------
+# AVAILABLE_REGIONS is the full experiment menu. Keep every region here that
+# is valid for the study and has a matching wide input file.
+# Use [] to allow every valid region from SiteDetails.
+AVAILABLE_REGIONS = [
+    "Sydney North-west",
+    "Sydney South-west",
+    "Upper Hunter",
+    "Sydney East",
+    "Northern Tablelands",
+    "Southern Tablelands",
+    "Lower Hunter",
+    "Mid-North Coast",
+    "Central Tablelands",
+    "Illawarra",
+    "Central Coast",
+]
+
+# These regions were used in the NoHistory ablation and/or routing development.
+# They are development data and must not enter the publication validation set.
+DEVELOPMENT_REGIONS = [
+    "Central Coast",
+    "Central Tablelands",
+    "Sydney North-west",
+    "Sydney South-west",
+]
+
+# Remaining configured study regions with matching regional-wide input files.
+# No model or routing decisions may be changed after inspecting these results.
+HELD_OUT_VALIDATION_REGIONS = [
+    "Lower Hunter",
+    "Northern Tablelands",
+    "Southern Tablelands",
+    "Sydney East",
+    "Upper Hunter",
+]
+
+# These configured regions are also held out, but no matching wide input exists
+# in API_Input/Inputs at freeze time, so they cannot be evaluated in this run.
+HELD_OUT_REGIONS_WITHOUT_INPUTS = [
+    "Mid-North Coast",
+    "Illawarra",
+]
+
+# SELECTED_REGIONS is the active run list.
+SELECTED_REGIONS = (
+    list(DEVELOPMENT_REGIONS)
+    if EXPERIMENT_MODE == "development_ablation"
+    else list(HELD_OUT_VALIDATION_REGIONS)
+)
+
+# AVAILABLE_SITES is normally derived from AVAILABLE_REGIONS. Leave [] unless
+# you need to restrict the region-derived station menu manually.
+AVAILABLE_SITES = []
+
+# SELECTED_SITES overrides region-derived stations. Use [] for the default
+# sites discovered from SELECTED_REGIONS; otherwise provide explicit site names.
+SELECTED_SITES = []
+
+# Backward-compatible names consumed by main.py and helper functions.
+TARGET_REGIONS = AVAILABLE_REGIONS
+TARGET_SITES = AVAILABLE_SITES
+SELECT_TARGET_REGIONS = SELECTED_REGIONS
+SELECT_TARGET_SITES = SELECTED_SITES
 # Optional dev-mode limits for quicker runs.
+
 # Example: set MAX_MODELS_TO_RUN = 2 to only run the first 2 models.
 MAX_MODELS_TO_RUN = 0
 
@@ -156,49 +392,20 @@ MC_N_NEIGHBORS = 5              # Number of neighbors for KNN
 # ============================================================================
 
 # Target variable(s) to impute
-TARGET_COLUMNS = ["PM2.5"]  # Example: Impute these variables
+TARGET_COLUMNS = ["PM10", "PM2.5"]  # Example: Impute these variables
+# TARGET_COLUMNS = ["PM10", "PM2.5", "NO2", "CO", "OZONE", "NOX", "NO"]  # Example: Impute these variables]
+# TARGET_COLUMNS = ["PM10", "PM2.5", "CO", "OZONE", "NO"]  # Example: Impute these variables]
 
-# Target sites / target regions
-# ✅ Use --all flag in main.py to process all available sites
-# ✅ If TARGET_REGIONS = [], all valid regions from SiteDetails will be used
-# ✅ If TARGET_SITES = [], sites will be derived automatically from TARGET_REGIONS
-# TARGET_REGIONS = ["Sydney North-west", "Sydney South-west"]
-
-TARGET_REGIONS = [
-    "Sydney North-west",
-    "Sydney South-west",
-    "Upper Hunter",
-    "Sydney East",
-    "Northern Tablelands",
-    "Southern Tablelands",
-    "Lower Hunter",
-    "Mid-North Coast",
-    "Central Tablelands",
-    "Illawarra",
-    "Central Coast",
-]
-TARGET_SITES = []     # [] = auto-derive from TARGET_REGIONS / region-site mapping
-
-# ---------------------------------------------------------------------------
-# RUN SELECTION (override TARGET_REGIONS/TARGET_SITES)
-# ---------------------------------------------------------------------------
-# Use [] to run ALL regions listed in TARGET_REGIONS, or set to a single region
-# name (or list of names) from TARGET_REGIONS to run only that subset.
-# Examples:
-#   SELECT_TARGET_REGIONS = []
-SELECT_TARGET_REGIONS = ["Lower Hunter"]
-# SELECT_TARGET_REGIONS = []
-
-# Use [] to run the default site list (derived from regions / discovered from inputs).
-# Or specify explicit site names (e.g., ["PARRAMATTA NORTH"]).
-SELECT_TARGET_SITES = []
-
+# "NOX",      # Nitrogen Oxides
+#     "PM10",     # Particulate Matter (10 micrometers)
+#     "PM2.5",    # Particulate Matter (2.5 micrometers)
+#     "SO2",
 # ---------------------------------------------------------------------------
 # BEST-PREDICTORS INPUTS (region + target specific)
 # ---------------------------------------------------------------------------
-# When enabled, main.py will pick input variables from this JSON for the
-# resolved region token (e.g., Sydney_North_west) and target (e.g., PM2.5).
-USE_BEST_PREDICTORS_JSON_INPUTS = True
+# Optional legacy fallback. Keep disabled unless
+# BestPredictors_ByRegionTarget.json has been generated.
+USE_BEST_PREDICTORS_JSON_INPUTS = False
 
 # Use the winning region/target configuration produced by FeatureStats Stage 3.
 # When a matching row exists, main.py uses its exact Feature_List in preference
@@ -216,7 +423,15 @@ PROGRESSIVE_BEST_FEATURES_CSV = os.environ.get(
 # Train one pooled model per region and report both per-site and regional
 # metrics using an equal artificial-missing count at every study site.
 REGIONAL_POOLED_MODE = True
-REGIONAL_EVALUATION_SEEDS = [42]
+REGIONAL_EVALUATION_SEEDS = [13, 29, 42, 77, 101, 137, 211, 307, 401, 503]
+# Run different regional target tasks concurrently. Native model threads are
+# divided across these workers when MODEL_N_JOBS is 0.
+TARGET_PARALLEL_WORKERS = 10
+MODEL_N_JOBS = 0
+# Keep the scheduler/combined framework log and also route each parallel
+# target's model messages to Logs/By_Target/<target>.log.
+SEPARATE_TARGET_LOGS = True
+TARGET_LOG_SUBDIR = os.path.join("Logs", "By_Target")
 BEST_PREDICTORS_JSON = os.environ.get(
     "BEST_PREDICTORS_JSON",
     "/mnt/scratch_lustre/ar_ai4ba_scratch/Ai4BetterAir/AQUISTIL/BestPredictors_ByRegionTarget.json",
@@ -259,6 +474,12 @@ INPUT_COLUMNS = [
     "WGU",      # Wind Gust
     "NEPH",     # Nephelometer / particle scattering proxy
 ]
+
+# Regional pooled fallback used when a region has no Stage 3 winning row. The
+# target is removed automatically and features with fewer than the configured
+# number of numeric observations are discarded before model execution.
+REGIONAL_GENERIC_FEATURES = list(LOCAL_ANALYSIS_INPUTS)
+REGIONAL_GENERIC_MIN_FEATURE_OBSERVATIONS = 50
 
 # ============================================================================
 # SPATIAL FEATURES (FROM OTHER SITES)
@@ -360,26 +581,6 @@ ROLLING_STATS = ['mean', 'std', 'min', 'max']
 ROLLING_FEATURE_COLUMNS = []
 
 # ============================================================================
-# MISSINGNESS EVALUATION
-# ============================================================================
-
-# Levels of artificial missingness to evaluate (as fractions)
-# MISSINGNESS_LEVELS = [0.10, 0.20, 0.30, 0.50]  # 10%, 20%, 30%, 50%
-MISSINGNESS_LEVELS = [0.10]  # 10%, 20%, 30%, 50%
-
-# ============================================================================
-# MISSINGNESS REGIME
-# ============================================================================
-
-# Event-specialist model-selection run.  Restore the full list below for the
-# final all-regime evaluation after selecting the winning candidate:
-# ['random', 'short_gap', 'medium_gap', 'long_gap', 'event']
-MISSINGNESS_REGIMES = ['event']
-
-# Default single regime (overridden by main.py when running all regimes)
-MISSINGNESS_REGIME = None
-
-# ============================================================================
 # SITE SELECTION
 # ============================================================================
 
@@ -426,7 +627,7 @@ METRICS_TO_CALCULATE = [
 SAVE_IMPUTED_DATA = True              # Save full imputed datasets
 SAVE_TARGET_COLUMN_DATA = True        # Save target column with missing type labels
 SAVE_METRICS = True                   # Save evaluation metrics
-SAVE_PLOTS = True                     # Generate evaluation plots
+SAVE_PLOTS = False                    # Generate evaluation plots
 
 PLOT_TYPES = [
     'error_distribution',

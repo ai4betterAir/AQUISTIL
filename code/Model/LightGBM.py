@@ -13,7 +13,7 @@ MODEL_NAME = "LightGBM"
 logging.basicConfig(level=logging. INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
-def impute_mice(data, target_column, input_columns, max_iter=10, random_state=42, 
+def impute_mice(data, target_column, input_columns, max_iter=1, random_state=42, 
                 custom_strategies=None, **kwargs):
     """
     LightGBM-based MICE imputation with spatial-temporal features
@@ -191,12 +191,24 @@ def impute_mice(data, target_column, input_columns, max_iter=10, random_state=42
         raise ValueError("No valid numeric columns for imputation")
     
     # Create LightGBM estimator
+    try:
+        model_n_jobs = int(kwargs.get("n_jobs", getattr(config, "MODEL_N_JOBS", -1)))
+    except (TypeError, ValueError):
+        model_n_jobs = -1
+    if model_n_jobs == 0:
+        model_n_jobs = -1
+
     lgb_estimator = lgb.LGBMRegressor(
-        n_estimators=100,
-        max_depth=5,
-        learning_rate=0.1,
+        n_estimators=60,
+        max_depth=3,
+        learning_rate=0.08,
+        num_leaves=15,
+        min_child_samples=40,
+        subsample=0.75,
+        colsample_bytree=0.75,
+        reg_lambda=2.0,
         random_state=random_state,
-        n_jobs=-1,
+        n_jobs=model_n_jobs,
         verbose=-1
     )
     
@@ -238,8 +250,9 @@ def impute_mice(data, target_column, input_columns, max_iter=10, random_state=42
         
         # Log convergence info
         if hasattr(imputer, 'n_iter_'):
-            logging.info(f"LightGBM iteration {imputer.n_iter_}/{max_iter}, change:   0.000049")
-            logging.info(f"LightGBM converged at iteration {imputer.n_iter_}")
+            logging.info(
+                f"LightGBM iterative imputation passes: {imputer.n_iter_}/{max_iter}"
+            )
         
         logging.info("LIGHTGBM imputation completed successfully.")
         

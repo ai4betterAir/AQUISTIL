@@ -1,0 +1,5 @@
+Region,Configuration,Blocks,Feature_List
+Central Coast,Selected_Local_Temporal_IDW (SLTI),SFTI,"CO,HUMID,NEPH,NO,NO2,PM10,TEMP,Hour,Day,DayOfWeek,DayOfYear,WeekOfYear,IDW_Spatial_PM25,SiteCode"
+Central Tablelands,Selected_Local_Temporal (SLT),SFT,"HUMID,NEPH,OZONE,PM10,TEMP,WSP,Hour,Day,DayOfWeek,DayOfYear,WeekOfYear,SiteCode"
+Sydney North-west,Selected_Local_Temporal_IDW (SLTI),SFTI,"CO,HUMID,NEPH,NO2,PM10,TEMP,Hour,Day,DayOfWeek,DayOfYear,WeekOfYear,IDW_Spatial_PM25,SiteCode"
+Sydney South-west,Selected_Local_Temporal_IDW (SLTI),SFTI,"HUMID,NEPH,PM10,TEMP,Hour,Day,DayOfWeek,DayOfYear,WeekOfYear,IDW_Spatial_PM25,SiteCode"

@@ -1,0 +1,6 @@
+Region,Configuration,Blocks,Feature_List
+Lower Hunter,Selected_Local_Temporal_IDW (SLTI),,"CO,HUMID,NEPH,NO,NO2,OZONE,TEMP,WDR,WSP,Hour,Day,DayOfWeek,DayOfYear,WeekOfYear,IDW_Spatial_PM25"
+Northern Tablelands,Selected_Local_Temporal (SLT),,"HUMID,NEPH,TEMP,WDR,WSP,Hour,Day,DayOfWeek,DayOfYear,WeekOfYear"
+Southern Tablelands,Selected_Local_Temporal_SpatialTarget_IDW (SLTSTI),,"HUMID,NEPH,NOX,TEMP,WDR,WSP,Hour,Day,DayOfWeek,DayOfYear,WeekOfYear,IDW_Spatial_PM25"
+Sydney East,Selected_Local_Temporal_IDW (SLTI),,"CO,HUMID,NEPH,NO,NO2,RAIN,TEMP,WDR,WSP,Hour,Day,DayOfWeek,DayOfYear,WeekOfYear,IDW_Spatial_PM25"
+Upper Hunter,Selected_Local_Temporal_IDW (SLTI),,"HUMID,NO2,TEMP,WDR,WSP,Hour,Day,DayOfWeek,DayOfYear,WeekOfYear,IDW_Spatial_PM25"
